@@ -70,7 +70,7 @@ contract Escrow is ReentrancyGuard {
     /// @notice Emitted when the escrow is refunded to the buyer.
     event EscrowRefunded(uint256 indexed id);
 
-    /// @notice Emitted a when either party escalates a shipped deal to the arbiter.
+    /// @notice Emitted when either party escalates a shipped deal to the arbiter.
     event DisputeRaised(uint256 indexed id, address indexed by);
 
     /// @notice Emitted when an address withdraws its accumulated balance.
@@ -88,6 +88,7 @@ contract Escrow is ReentrancyGuard {
     /// @return id the identifier of the new escrow (to share with the seller)
     function createEscrow() external payable returns (uint256 id) {
         require(msg.value > 0, "amount must be positive");
+        require(msg.sender != arbiter, "arbiter cannot be a party");
 
         id = nextId;
         transactions[id] = Transaction({
@@ -113,10 +114,28 @@ contract Escrow is ReentrancyGuard {
         require(t.state == State.Funded, "escrow not joinable");
         require(t.seller == address(0), "seller already joined");
         require(msg.sender != t.buyer, "buyer cannot be seller");
+        require(msg.sender != arbiter, "arbiter cannot be a party");
 
         t.seller = msg.sender;
 
         emit SellerJoined(_id, msg.sender);
+    }
+
+    /// @notice Buyer cancels and reclaims the funds while no seller has joined,
+    ///         moving Funded -> Refunded without waiting for the ship timeout.
+    /// @param _id the escrow to cancel
+    function cancelEscrow(uint256 _id) external {
+        require(_id < nextId, "escrow does not exist");
+
+        Transaction storage t = transactions[_id];
+        require(msg.sender == t.buyer, "only buyer can cancel");
+        require(t.state == State.Funded, "escrow not in Funded state");
+        require(t.seller == address(0), "seller already joined");
+
+        t.state = State.Refunded;
+        pendingWithdrawals[t.buyer] += t.amount;
+
+        emit EscrowRefunded(_id);
     }
 
     /// @notice Seller marks the item as shipped, moving Funded -> Shipped and
