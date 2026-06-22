@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		5C26E8DE2FE9CA850074E322 /* AlloySwift in Frameworks */ = {isa = PBXBuildFile; productRef = 5C26E8DD2FE9CA850074E322 /* AlloySwift */; };
+		5C26E8EB2FE9E2760074E322 /* AlloySwift in Frameworks */ = {isa = PBXBuildFile; productRef = 5C26E8EA2FE9E2760074E322 /* AlloySwift */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		5CC08A1F2FE86A2E00DFBC31 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +57,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5C26E8EB2FE9E2760074E322 /* AlloySwift in Frameworks */,
+				5C26E8DE2FE9CA850074E322 /* AlloySwift in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +119,8 @@
 			);
 			name = escrow;
 			packageProductDependencies = (
+				5C26E8DD2FE9CA850074E322 /* AlloySwift */,
+				5C26E8EA2FE9E2760074E322 /* AlloySwift */,
 			);
 			productName = escrow;
 			productReference = 5CC08A0F2FE86A2D00DFBC31 /* escrow.app */;
@@ -195,6 +204,9 @@
 			);
 			mainGroup = 5CC08A062FE86A2D00DFBC31;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				5C26E8E92FE9E2760074E322 /* XCLocalSwiftPackageReference "../../visoft/alloy-swift/AlloySwift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 5CC08A102FE86A2D00DFBC31 /* Products */;
 			projectDirPath = "";
@@ -580,6 +592,24 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		5C26E8E92FE9E2760074E322 /* XCLocalSwiftPackageReference "../../visoft/alloy-swift/AlloySwift" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../../visoft/alloy-swift/AlloySwift";
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		5C26E8DD2FE9CA850074E322 /* AlloySwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AlloySwift;
+		};
+		5C26E8EA2FE9E2760074E322 /* AlloySwift */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AlloySwift;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 5CC08A072FE86A2D00DFBC31 /* Project object */;
 }

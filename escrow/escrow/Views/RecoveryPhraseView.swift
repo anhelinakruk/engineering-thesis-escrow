@@ -125,7 +125,10 @@ struct RecoveryPhraseView: View {
 
 #Preview {
     NavigationStack {
-        RecoveryPhraseView(mnemonic: try! MockWalletService().createWallet())
+        RecoveryPhraseView(mnemonic: Mnemonic(words: [
+            "ocean", "target", "lemon", "puzzle", "garden", "velvet",
+            "ridge", "comfort", "anchor", "sunny", "marble", "falcon",
+        ]))
     }
     .preferredColorScheme(.dark)
 }
