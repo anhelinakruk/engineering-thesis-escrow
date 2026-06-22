@@ -2,9 +2,8 @@ services:
   surrealdb:
     container_name: escrow-surrealdb
     hostname: surrealdb
-    build:
-      context: .
-      dockerfile: ./surrealdb.Dockerfile
+    image: surrealdb/surrealdb:v2.3.3
+    command: ["start", "--bind", "0.0.0.0:8000", "--user", "root", "--pass", "root"]
     env_file:
       - .env
     ports:
