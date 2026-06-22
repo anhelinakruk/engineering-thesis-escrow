@@ -17,6 +17,11 @@ struct NewTransactionView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var amount = ""
     @State private var details = ""
+    @FocusState private var focusedField: Field?
+
+    private enum Field {
+        case amount, details
+    }
 
     private var fiatText: String {
         let eth = Double(amount.replacingOccurrences(of: ",", with: ".")) ?? 0
@@ -41,6 +46,10 @@ struct NewTransactionView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
+                }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { focusedField = nil }
                 }
             }
             .tint(.brandTeal)
@@ -80,6 +89,7 @@ struct NewTransactionView: View {
                     .foregroundStyle(.white)
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.center)
+                    .focused($focusedField, equals: .amount)
                     .fixedSize()
                 Text("ETH")
                     .font(.title)
@@ -97,6 +107,9 @@ struct NewTransactionView: View {
             Color.white.opacity(0.04),
             in: RoundedRectangle(cornerRadius: 18, style: .continuous)
         )
+        // The amount field is small; let a tap anywhere on the card focus it.
+        .contentShape(Rectangle())
+        .onTapGesture { focusedField = .amount }
     }
 
     private var descriptionField: some View {
@@ -118,6 +131,7 @@ struct NewTransactionView: View {
                     .foregroundStyle(.white)
                     .scrollContentBackground(.hidden)
                     .frame(minHeight: 90)
+                    .focused($focusedField, equals: .details)
             }
             .padding(12)
             .background(
