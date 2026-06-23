@@ -20,6 +20,8 @@ struct TransactionDetailView: View {
 
     private let details = "MacBook Pro 14, 2023, excellent condition. Local pickup, Warsaw, Mokotów."
 
+    @State private var showingInviteLink = false
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
@@ -34,6 +36,18 @@ struct TransactionDetailView: View {
         .background(Color.appBackground)
         .navigationTitle("Transaction")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showingInviteLink = true
+                } label: {
+                    Image(systemName: "link")
+                }
+            }
+        }
+        .sheet(isPresented: $showingInviteLink) {
+            JoinTransactionView()
+        }
         .safeAreaInset(edge: .bottom) {
             if showsBuyerActions {
                 VStack(spacing: 12) {
@@ -61,8 +75,6 @@ struct TransactionDetailView: View {
             }
         }
     }
-
-    // MARK: Status
 
     private var statusCard: some View {
         VStack(spacing: 14) {
