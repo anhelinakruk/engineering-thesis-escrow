@@ -30,18 +30,14 @@ struct AuthService {
         }
     }
 
-    /// Signs in with the wallet stored in the Keychain. Returns the JWT response
-    /// and caches the token in the Keychain.
-    @discardableResult
-    func login() async throws -> AuthResponse {
-        guard let mnemonic = keychain.read(WalletKeychainKeys.mnemonic),
-              let address = keychain.read(WalletKeychainKeys.address) else {
+    /// Fetches a nonce and builds the SIWE message to show the user before they
+    /// sign. Read-only — no signing, no key access.
+    func prepareSIWEMessage() async throws -> String {
+        guard let address = keychain.read(WalletKeychainKeys.address) else {
             throw AuthError.noWallet
         }
-
         let nonce = try await backend.getNonce()
-
-        let message = SIWEMessage(
+        return SIWEMessage(
             domain: URL(string: AppConfig.backendBaseURL)?.host ?? "localhost",
             address: address,
             statement: "Sign in to Escrow",
@@ -50,15 +46,30 @@ struct AuthService {
             chainId: AppConfig.chainId,
             nonce: nonce
         ).format()
+    }
 
+    /// Signs the given SIWE message on-device (Rust) and verifies it on the
+    /// backend, caching the returned JWT in the Keychain.
+    @discardableResult
+    func completeLogin(message: String) async throws -> AuthResponse {
+        guard let mnemonic = keychain.read(WalletKeychainKeys.mnemonic),
+              let address = keychain.read(WalletKeychainKeys.address) else {
+            throw AuthError.noWallet
+        }
         let signature = try await signMessage(mnemonic: mnemonic, message: message)
         let auth = try await backend.verifyAndLogin(
             message: message,
             signature: signature,
             address: address
         )
-
         keychain.save(auth.accessToken, for: WalletKeychainKeys.token)
         return auth
+    }
+
+    /// Convenience: prepare + complete in one shot (e.g. silent re-login).
+    @discardableResult
+    func login() async throws -> AuthResponse {
+        let message = try await prepareSIWEMessage()
+        return try await completeLogin(message: message)
     }
 }

@@ -3,30 +3,29 @@
 //  escrow
 //
 //  Owns the app's top-level navigation. Until a wallet exists it drives the
-//  onboarding (Welcome -> Recovery phrase / Import); once a wallet is set up it
-//  shows the wallet home. The service that does the work is injected here so the
-//  screens stay free of it.
+//  onboarding (Welcome -> Recovery phrase / Import -> SIWE sign-in); once the
+//  user has signed in it shows the wallet home. The services that do the work
+//  are injected here so the screens stay free of them.
 //
 
 import SwiftUI
 
 /// Destinations reachable during onboarding. The recovery-phrase route carries
-/// its mnemonic so the destination is built purely from the route value — no
-/// reliance on separate state that may not be ready when navigation evaluates.
+/// its mnemonic so the destination is built purely from the route value.
 enum OnboardingRoute: Hashable {
     case recoveryPhrase(Mnemonic)
     case importWallet
 }
 
 struct RootView: View {
-    /// Rust-backed wallet (AlloySwift via UniFFI). Use `MockWalletService()` in
-    /// previews where the Rust framework / Keychain aren't available.
+    /// Rust-backed wallet (AlloySwift via UniFFI).
     private let wallet: WalletService = AlloyWalletService()
     private let auth = AuthService()
 
     @State private var hasWallet = false
     @State private var path: [OnboardingRoute] = []
     @State private var errorMessage: String?
+    @State private var siwePrompt: SIWEPrompt?
 
     var body: some View {
         Group {
@@ -56,16 +55,20 @@ struct RootView: View {
             .navigationDestination(for: OnboardingRoute.self) { route in
                 switch route {
                 case .recoveryPhrase(let mnemonic):
-                    RecoveryPhraseView(
-                        mnemonic: mnemonic,
-                        onContinue: enterApp
-                    )
-                    .navigationBarBackButtonHidden(true)
+                    RecoveryPhraseView(mnemonic: mnemonic, onContinue: presentSignIn)
+                        .navigationBarBackButtonHidden(true)
                 case .importWallet:
                     ImportWalletView(onImport: importWallet)
                         .navigationBarBackButtonHidden(true)
                 }
             }
+        }
+        .sheet(item: $siwePrompt) { prompt in
+            SigningSheet(
+                message: prompt.message,
+                onSign: { try await completeSignIn(message: prompt.message) },
+                onCancel: { siwePrompt = nil }
+            )
         }
     }
 
@@ -81,45 +84,50 @@ struct RootView: View {
         }
     }
 
-    /// Restores a wallet from a pasted/typed phrase and enters the app.
+    /// Restores a wallet from a phrase, then moves on to the SIWE sign-in.
     private func importWallet(phrase: String) {
         Task {
             do {
                 try await wallet.importWallet(phrase: phrase)
-                hasWallet = true
-                Task { await signIn() }
+                presentSignIn()
             } catch {
                 errorMessage = error.localizedDescription
             }
         }
     }
 
-    /// Enters the app immediately, then signs in to the backend in the
-    /// background. SIWE login must never sit on the critical path — the wallet
-    /// already exists on the device, so the user shouldn't wait for the server.
-    private func enterApp() {
-        hasWallet = true
-        Task { await signIn() }
-    }
-
-    /// Best-effort SIWE login. `nonisolated` so the on-device signing and the
-    /// network round-trip run off the main actor and never freeze the UI;
-    /// failures are non-fatal (the wallet works locally regardless).
-    private nonisolated func signIn() async {
-        do {
-            try await auth.login()
-        } catch {
-            print("SIWE login failed (continuing offline): \(error)")
+    /// Fetches a nonce, builds the SIWE message, and presents the signing sheet.
+    private func presentSignIn() {
+        Task {
+            do {
+                let message = try await auth.prepareSIWEMessage()
+                siwePrompt = SIWEPrompt(message: message)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
-    /// Drives the error alert off `errorMessage` without a second flag.
+    /// Signs + verifies the SIWE message; on success enters the app. Throwing
+    /// propagates to `SigningSheet` so it can show the failure and allow a retry.
+    private func completeSignIn(message: String) async throws {
+        _ = try await auth.completeLogin(message: message)
+        siwePrompt = nil
+        hasWallet = true
+    }
+
     private var showingError: Binding<Bool> {
         Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
         )
     }
+}
+
+/// Wraps the SIWE message so it can drive `.sheet(item:)`.
+private struct SIWEPrompt: Identifiable {
+    let id = UUID()
+    let message: String
 }
 
 #Preview {
