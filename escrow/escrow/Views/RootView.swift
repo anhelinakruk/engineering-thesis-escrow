@@ -2,10 +2,9 @@
 //  RootView.swift
 //  escrow
 //
-//  Owns the app's top-level navigation. Until a wallet exists it drives the
-//  onboarding (Welcome -> Recovery phrase / Import -> SIWE sign-in); once the
-//  user has signed in it shows the wallet home. The services that do the work
-//  are injected here so the screens stay free of them.
+//  Top-level view. Observes `WalletViewModel` and renders the right screen for
+//  the current state (restore splash -> lock -> home, or onboarding). It holds
+//  only navigation (`path`); all state and logic live in the view-model.
 //
 
 import SwiftUI
@@ -18,20 +17,25 @@ enum OnboardingRoute: Hashable {
 }
 
 struct RootView: View {
-    /// Rust-backed wallet (AlloySwift via UniFFI).
-    private let wallet: WalletService = AlloyWalletService()
-    private let auth = AuthService()
-
-    @State private var hasWallet = false
+    @StateObject private var vm = WalletViewModel()
     @State private var path: [OnboardingRoute] = []
-    @State private var errorMessage: String?
-    @State private var siwePrompt: SIWEPrompt?
 
     var body: some View {
         Group {
-            if hasWallet {
+            if vm.isRestoring {
+                restoreSplash
+            } else if vm.hasWallet && !vm.isUnlocked {
+                LockView(
+                    symbolName: vm.biometricSymbol,
+                    typeLabel: vm.biometricLabel,
+                    onUnlock: { Task { await vm.unlock() } }
+                )
+            } else if vm.hasWallet {
                 NavigationStack {
-                    HomeView()
+                    HomeView(onLogout: {
+                        vm.logout()
+                        path = []
+                    })
                 }
             } else {
                 onboarding
@@ -39,95 +43,71 @@ struct RootView: View {
         }
         .tint(.brandTeal)
         .preferredColorScheme(.dark)
-        .alert("Something went wrong", isPresented: showingError) {
+        .task { vm.restoreSession() }
+        .alert("Something went wrong", isPresented: errorBinding) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text(errorMessage ?? "")
+            Text(vm.errorMessage ?? "")
         }
+    }
+
+    private var restoreSplash: some View {
+        ProgressView()
+            .tint(.brandTeal)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.appBackground)
     }
 
     private var onboarding: some View {
         NavigationStack(path: $path) {
             WelcomeView(
-                onCreate: createWallet,
+                onCreate: {
+                    Task {
+                        if let mnemonic = await vm.createWallet() {
+                            path.append(.recoveryPhrase(mnemonic))
+                        }
+                    }
+                },
                 onImport: { path.append(.importWallet) }
             )
             .navigationDestination(for: OnboardingRoute.self) { route in
                 switch route {
                 case .recoveryPhrase(let mnemonic):
-                    RecoveryPhraseView(mnemonic: mnemonic, onContinue: presentSignIn)
-                        .navigationBarBackButtonHidden(true)
+                    RecoveryPhraseView(
+                        mnemonic: mnemonic,
+                        onContinue: { Task { await vm.prepareSignIn() } }
+                    )
+                    .navigationBarBackButtonHidden(true)
                 case .importWallet:
-                    ImportWalletView(onImport: importWallet)
+                    ImportWalletView(onImport: vm.importWallet)
                         .navigationBarBackButtonHidden(true)
                 }
             }
         }
-        .sheet(item: $siwePrompt) { prompt in
-            SigningSheet(
-                message: prompt.message,
-                onSign: { try await completeSignIn(message: prompt.message) },
-                onCancel: { siwePrompt = nil }
-            )
-        }
-    }
-
-    /// Generates a wallet and advances to the recovery-phrase screen.
-    private func createWallet() {
-        Task {
-            do {
-                let mnemonic = try await wallet.createWallet()
-                path.append(.recoveryPhrase(mnemonic))
-            } catch {
-                errorMessage = error.localizedDescription
+        .sheet(isPresented: signingPresented) {
+            if let message = vm.pendingSIWEMessage {
+                SigningSheet(
+                    message: message,
+                    onSign: { try await vm.completeSignIn() },
+                    onCancel: { vm.cancelSignIn() }
+                )
             }
         }
     }
 
-    /// Restores a wallet from a phrase, then moves on to the SIWE sign-in.
-    private func importWallet(phrase: String) {
-        Task {
-            do {
-                try await wallet.importWallet(phrase: phrase)
-                presentSignIn()
-            } catch {
-                errorMessage = error.localizedDescription
-            }
-        }
-    }
-
-    /// Fetches a nonce, builds the SIWE message, and presents the signing sheet.
-    private func presentSignIn() {
-        Task {
-            do {
-                let message = try await auth.prepareSIWEMessage()
-                siwePrompt = SIWEPrompt(message: message)
-            } catch {
-                errorMessage = error.localizedDescription
-            }
-        }
-    }
-
-    /// Signs + verifies the SIWE message; on success enters the app. Throwing
-    /// propagates to `SigningSheet` so it can show the failure and allow a retry.
-    private func completeSignIn(message: String) async throws {
-        _ = try await auth.completeLogin(message: message)
-        siwePrompt = nil
-        hasWallet = true
-    }
-
-    private var showingError: Binding<Bool> {
+    private var signingPresented: Binding<Bool> {
         Binding(
-            get: { errorMessage != nil },
-            set: { if !$0 { errorMessage = nil } }
+            get: { vm.pendingSIWEMessage != nil },
+            set: { if !$0 { vm.cancelSignIn() } }
         )
     }
-}
 
-/// Wraps the SIWE message so it can drive `.sheet(item:)`.
-private struct SIWEPrompt: Identifiable {
-    let id = UUID()
-    let message: String
+    private var errorBinding: Binding<Bool> {
+        Binding(
+            get: { vm.errorMessage != nil },
+            set: { if !$0 { vm.errorMessage = nil } }
+        )
+    }
 }
 
 #Preview {
