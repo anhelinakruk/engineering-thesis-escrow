@@ -33,7 +33,7 @@ struct BackendService {
         self.baseURL = baseURL
     }
 
-    /// `GET /api/auth/nonce` — a fresh single-use nonce to put in the SIWE message.
+    /// `GET /api/auth/nonce
     func getNonce() async throws -> String {
         guard let url = URL(string: "\(baseURL)/api/auth/nonce") else {
             throw BackendError.invalidURL
@@ -47,8 +47,7 @@ struct BackendService {
         }
     }
 
-    /// `POST /api/auth/verify` — server recovers the signer, checks it matches
-    /// `address`, and returns a JWT.
+    /// `POST /api/auth/verify
     func verifyAndLogin(
         message: String,
         signature: String,

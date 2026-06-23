@@ -9,12 +9,12 @@
 
 import Foundation
 
-/// Reply to `GET /api/auth/nonce`.
+/// `GET /api/auth/nonce`.
 struct NonceResponse: Decodable {
     let nonce: String
 }
 
-/// Reply to `POST /api/auth/verify`.
+/// `POST /api/auth/verify`.
 struct AuthResponse: Decodable {
     let accessToken: String
     let userId: String
@@ -25,9 +25,6 @@ struct AuthResponse: Decodable {
     }
 }
 
-/// A SIWE (EIP-4361-style) message. The backend pulls the nonce out of the
-/// formatted text (it scans for the "Nonce: " line), recovers the signer from
-/// the signature, and checks it equals `address`.
 struct SIWEMessage {
     let domain: String
     let address: String

@@ -35,12 +35,8 @@ final class WalletViewModel: ObservableObject {
         self.biometrics = biometrics
     }
 
-    // MARK: Biometric display
-
     var biometricSymbol: String { biometrics.symbolName }
     var biometricLabel: String { biometrics.typeLabel }
-
-    // MARK: Session
 
     func restoreSession() {
         let hasStored = keychain.read(WalletKeychainKeys.mnemonic) != nil
