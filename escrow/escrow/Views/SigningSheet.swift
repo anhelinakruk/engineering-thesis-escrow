@@ -12,7 +12,6 @@ import SwiftUI
 
 struct SigningSheet: View {
     let message: String
-    /// Sign + verify. Throwing surfaces the failure inline so the user can retry.
     let onSign: () async throws -> Void
     let onCancel: () -> Void
 

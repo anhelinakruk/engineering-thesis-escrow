@@ -18,8 +18,7 @@ struct TransactionDetailView: View {
     private let steps = ["Created", "Funded", "Sent", "Completed"]
     private let usdPerEth = 3800.0
 
-    /// Sample description; a real escrow would carry this from its terms.
-    private let details = "MacBook Pro 14, 2023, excellent condition. Local pickup, Warsaw — Mokotów."
+    private let details = "MacBook Pro 14, 2023, excellent condition. Local pickup, Warsaw, Mokotów."
 
     var body: some View {
         ScrollView {

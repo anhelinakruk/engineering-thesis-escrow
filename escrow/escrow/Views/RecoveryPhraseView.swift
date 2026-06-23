@@ -11,7 +11,6 @@ import UIKit
 
 struct RecoveryPhraseView: View {
     let mnemonic: Mnemonic
-    /// Called when the user confirms they saved the phrase.
     var onContinue: () -> Void = {}
 
     @Environment(\.dismiss) private var dismiss
