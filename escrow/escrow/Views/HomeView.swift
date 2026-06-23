@@ -97,11 +97,10 @@ struct HomeView: View {
                     Text("JK")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Color.brandTeal)
-                        .frame(width: 38, height: 38)
-                        .background(Circle().fill(Color.white.opacity(0.04)))
+                        .frame(width: 32, height: 32)
                         .overlay(Circle().stroke(Color.brandTeal, lineWidth: 1.5))
                 }
-                .buttonStyle(.plain)
+                .buttonBorderShape(.circle)
             }
         }
         .tint(.brandTeal)
