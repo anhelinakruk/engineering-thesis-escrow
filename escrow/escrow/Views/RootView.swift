@@ -43,6 +43,7 @@ struct RootView: View {
         }
         .tint(.brandTeal)
         .preferredColorScheme(.dark)
+        .buttonStyle(FlatButtonStyle())
         .task { vm.restoreSession() }
         .alert("Something went wrong", isPresented: errorBinding) {
             Button("OK", role: .cancel) {}
