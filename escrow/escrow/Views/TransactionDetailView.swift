@@ -18,8 +18,9 @@ struct TransactionDetailView: View {
     private let steps = ["Created", "Funded", "Sent", "Completed"]
     private let usdPerEth = 3800.0
 
-    /// Sample description; a real escrow would carry this from its terms.
-    private let details = "MacBook Pro 14, 2023, excellent condition. Local pickup, Warsaw — Mokotów."
+    private let details = "MacBook Pro 14, 2023, excellent condition. Local pickup, Warsaw, Mokotów."
+
+    @State private var showingInviteLink = false
 
     var body: some View {
         ScrollView {
@@ -35,6 +36,18 @@ struct TransactionDetailView: View {
         .background(Color.appBackground)
         .navigationTitle("Transaction")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showingInviteLink = true
+                } label: {
+                    Image(systemName: "link")
+                }
+            }
+        }
+        .sheet(isPresented: $showingInviteLink) {
+            JoinTransactionView()
+        }
         .safeAreaInset(edge: .bottom) {
             if showsBuyerActions {
                 VStack(spacing: 12) {
@@ -62,8 +75,6 @@ struct TransactionDetailView: View {
             }
         }
     }
-
-    // MARK: Status
 
     private var statusCard: some View {
         VStack(spacing: 14) {

@@ -10,8 +10,6 @@
 import SwiftUI
 import UIKit
 
-/// Display status for a transaction row. A presentational stand-in that will be
-/// reconciled with the on-chain `EscrowState` once real data is wired.
 enum TxStatus {
     case send, created, funded, shipped, completed, refunded, disputed
 
@@ -39,7 +37,6 @@ enum TxStatus {
     }
 }
 
-/// One row in the wallet list. Sample/display model for now.
 struct WalletTransaction: Identifiable, Hashable {
     let id = UUID()
     let name: String
@@ -69,9 +66,12 @@ extension WalletTransaction {
 }
 
 struct HomeView: View {
+    var onLogout: () -> Void = {}
+
     private let address = "0×7F3a...9E2b"
     @State private var didCopyAddress = false
     @State private var showingNewTransaction = false
+    @State private var showLogoutConfirm = false
 
     var body: some View {
         ScrollView {
@@ -91,11 +91,16 @@ struct HomeView: View {
         .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Text("JK")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.brandTeal)
-                    .frame(width: 38, height: 38)
-                    .overlay(Circle().stroke(Color.brandTeal, lineWidth: 1.5))
+                Button {
+                    showLogoutConfirm = true
+                } label: {
+                    Text("JK")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(Color.brandTeal)
+                        .frame(width: 32, height: 32)
+                        .overlay(Circle().stroke(Color.brandTeal, lineWidth: 1.5))
+                }
+                .buttonBorderShape(.circle)
             }
         }
         .tint(.brandTeal)
@@ -119,6 +124,15 @@ struct HomeView: View {
         }
         .sheet(isPresented: $showingNewTransaction) {
             NewTransactionView()
+        }
+        .sheet(isPresented: $showLogoutConfirm) {
+            LogoutSheet(
+                onConfirm: {
+                    showLogoutConfirm = false
+                    onLogout()
+                },
+                onCancel: { showLogoutConfirm = false }
+            )
         }
     }
 

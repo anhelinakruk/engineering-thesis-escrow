@@ -18,7 +18,7 @@ struct JoinTransactionView: View {
     private let inviterColor = Color(red: 0.52, green: 0.40, blue: 0.85)
     private let inviterAddress = "0×7F3a...9E2b"
     private let amountEth = "0.82"
-    private let terms = "MacBook Pro 14, 2023, excellent condition. Local pickup, Warsaw — Mokotów."
+    private let terms = "MacBook Pro 14, 2023, excellent condition. Local pickup, Warsaw, Mokotów."
     private let usdPerEth = 3800.0
 
     private var fiatText: String {

@@ -2,37 +2,40 @@
 //  RootView.swift
 //  escrow
 //
-//  Owns the app's top-level navigation. Until a wallet exists it drives the
-//  onboarding (Welcome -> Recovery phrase / Import); once a wallet is set up it
-//  shows the wallet home. The service that does the work is injected here so the
-//  screens stay free of it.
+//  Top-level view. Observes `WalletViewModel` and renders the right screen for
+//  the current state (restore splash -> lock -> home, or onboarding). It holds
+//  only navigation (`path`); all state and logic live in the view-model.
 //
 
 import SwiftUI
 
 /// Destinations reachable during onboarding. The recovery-phrase route carries
-/// its mnemonic so the destination is built purely from the route value — no
-/// reliance on separate state that may not be ready when navigation evaluates.
+/// its mnemonic so the destination is built purely from the route value.
 enum OnboardingRoute: Hashable {
     case recoveryPhrase(Mnemonic)
     case importWallet
 }
 
 struct RootView: View {
-    /// Rust-backed wallet (AlloySwift via UniFFI). Use `MockWalletService()` in
-    /// previews where the Rust framework / Keychain aren't available.
-    private let wallet: WalletService = AlloyWalletService()
-    private let auth = AuthService()
-
-    @State private var hasWallet = false
+    @StateObject private var vm = WalletViewModel()
     @State private var path: [OnboardingRoute] = []
-    @State private var errorMessage: String?
 
     var body: some View {
         Group {
-            if hasWallet {
+            if vm.isRestoring {
+                restoreSplash
+            } else if vm.hasWallet && !vm.isUnlocked {
+                LockView(
+                    symbolName: vm.biometricSymbol,
+                    typeLabel: vm.biometricLabel,
+                    onUnlock: { Task { await vm.unlock() } }
+                )
+            } else if vm.hasWallet {
                 NavigationStack {
-                    HomeView()
+                    HomeView(onLogout: {
+                        vm.logout()
+                        path = []
+                    })
                 }
             } else {
                 onboarding
@@ -40,17 +43,32 @@ struct RootView: View {
         }
         .tint(.brandTeal)
         .preferredColorScheme(.dark)
-        .alert("Something went wrong", isPresented: showingError) {
+        .buttonStyle(FlatButtonStyle())
+        .task { vm.restoreSession() }
+        .alert("Something went wrong", isPresented: errorBinding) {
             Button("OK", role: .cancel) {}
         } message: {
-            Text(errorMessage ?? "")
+            Text(vm.errorMessage ?? "")
         }
+    }
+
+    private var restoreSplash: some View {
+        ProgressView()
+            .tint(.brandTeal)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.appBackground)
     }
 
     private var onboarding: some View {
         NavigationStack(path: $path) {
             WelcomeView(
-                onCreate: createWallet,
+                onCreate: {
+                    Task {
+                        if let mnemonic = await vm.createWallet() {
+                            path.append(.recoveryPhrase(mnemonic))
+                        }
+                    }
+                },
                 onImport: { path.append(.importWallet) }
             )
             .navigationDestination(for: OnboardingRoute.self) { route in
@@ -58,66 +76,37 @@ struct RootView: View {
                 case .recoveryPhrase(let mnemonic):
                     RecoveryPhraseView(
                         mnemonic: mnemonic,
-                        onContinue: enterApp
+                        onContinue: { Task { await vm.prepareSignIn() } }
                     )
                     .navigationBarBackButtonHidden(true)
                 case .importWallet:
-                    ImportWalletView(onImport: importWallet)
+                    ImportWalletView(onImport: vm.importWallet)
                         .navigationBarBackButtonHidden(true)
                 }
             }
         }
-    }
-
-    /// Generates a wallet and advances to the recovery-phrase screen.
-    private func createWallet() {
-        Task {
-            do {
-                let mnemonic = try await wallet.createWallet()
-                path.append(.recoveryPhrase(mnemonic))
-            } catch {
-                errorMessage = error.localizedDescription
+        .sheet(isPresented: signingPresented) {
+            if let message = vm.pendingSIWEMessage {
+                SigningSheet(
+                    message: message,
+                    onSign: { try await vm.completeSignIn() },
+                    onCancel: { vm.cancelSignIn() }
+                )
             }
         }
     }
 
-    /// Restores a wallet from a pasted/typed phrase and enters the app.
-    private func importWallet(phrase: String) {
-        Task {
-            do {
-                try await wallet.importWallet(phrase: phrase)
-                hasWallet = true
-                Task { await signIn() }
-            } catch {
-                errorMessage = error.localizedDescription
-            }
-        }
-    }
-
-    /// Enters the app immediately, then signs in to the backend in the
-    /// background. SIWE login must never sit on the critical path — the wallet
-    /// already exists on the device, so the user shouldn't wait for the server.
-    private func enterApp() {
-        hasWallet = true
-        Task { await signIn() }
-    }
-
-    /// Best-effort SIWE login. `nonisolated` so the on-device signing and the
-    /// network round-trip run off the main actor and never freeze the UI;
-    /// failures are non-fatal (the wallet works locally regardless).
-    private nonisolated func signIn() async {
-        do {
-            try await auth.login()
-        } catch {
-            print("SIWE login failed (continuing offline): \(error)")
-        }
-    }
-
-    /// Drives the error alert off `errorMessage` without a second flag.
-    private var showingError: Binding<Bool> {
+    private var signingPresented: Binding<Bool> {
         Binding(
-            get: { errorMessage != nil },
-            set: { if !$0 { errorMessage = nil } }
+            get: { vm.pendingSIWEMessage != nil },
+            set: { if !$0 { vm.cancelSignIn() } }
+        )
+    }
+
+    private var errorBinding: Binding<Bool> {
+        Binding(
+            get: { vm.errorMessage != nil },
+            set: { if !$0 { vm.errorMessage = nil } }
         )
     }
 }

@@ -13,15 +13,11 @@ import Foundation
 import Security
 import AlloySwift
 
-/// A wallet recovery phrase — the ordered list of mnemonic words.
 struct Mnemonic: Hashable {
     let words: [String]
-
-    /// The phrase as a single space-separated string (for copy / import).
     var phrase: String { words.joined(separator: " ") }
 }
 
-/// Failures a wallet operation can surface.
 enum WalletError: Error, LocalizedError {
     case invalidPhrase
     case entropyFailure
@@ -36,17 +32,11 @@ enum WalletError: Error, LocalizedError {
     }
 }
 
-/// Operations for creating and restoring the local wallet.
 protocol WalletService {
-    /// Creates a brand-new wallet and returns its recovery phrase to display.
     func createWallet() async throws -> Mnemonic
-
-    /// Restores a wallet from an existing recovery phrase. Throws if the phrase
-    /// is invalid.
     func importWallet(phrase: String) async throws
 }
 
-/// Real implementation backed by the Rust layer (AlloySwift) and the Keychain.
 struct AlloyWalletService: WalletService {
     private let keychain = KeychainStore(service: WalletKeychainKeys.service)
 
@@ -86,10 +76,7 @@ struct AlloyWalletService: WalletService {
     }
 }
 
-/// In-memory placeholder kept for SwiftUI previews and tests.
-///
-/// WARNING: NOT cryptographically secure and NOT a real BIP-39 phrase. It only
-/// yields plausible-looking words so screens can render without the Rust layer.
+// Mock
 struct MockWalletService: WalletService {
     private static let sampleWords = [
         "ocean", "target", "lemon", "puzzle", "garden", "velvet",
