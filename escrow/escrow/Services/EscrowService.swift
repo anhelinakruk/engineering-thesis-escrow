@@ -10,7 +10,6 @@
 
 import Foundation
 
-/// Failures a service operation can surface, mirroring the contract's reverts.
 enum EscrowError: Error, LocalizedError {
     case notFound
     case unauthorized(String)
@@ -34,20 +33,13 @@ enum EscrowError: Error, LocalizedError {
     }
 }
 
-/// Every operation the local wallet can perform against the escrow contract.
-///
-/// Calls are `async` because the real implementation talks to the Sepolia
-/// network, and `throws` because the chain can reject a transaction (wrong
-/// state, wrong caller, deadline not reached, ...). Mutating calls return the
-/// escrow's fresh state so the UI can refresh without a second round-trip.
+
 protocol EscrowService {
-    /// The local wallet's address (from the iOS Keychain in the real impl).
     var myAddress: EthAddress { get }
 
     // MARK: Reads
     func listEscrows() async throws -> [Escrow]
     func escrow(id: UInt64) async throws -> Escrow
-    /// How much ETH (in wei) the local wallet may currently withdraw.
     func pendingWithdrawalWei() async throws -> String
 
     // MARK: Buyer actions
@@ -69,6 +61,5 @@ protocol EscrowService {
     func resolveForBuyer(id: UInt64) async throws -> Escrow
 
     // MARK: Funds
-    /// Drains the local wallet's entire pending balance to itself.
     func withdraw() async throws
 }

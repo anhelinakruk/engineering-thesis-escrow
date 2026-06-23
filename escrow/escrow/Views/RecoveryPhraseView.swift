@@ -11,7 +11,6 @@ import UIKit
 
 struct RecoveryPhraseView: View {
     let mnemonic: Mnemonic
-    /// Called when the user confirms they saved the phrase.
     var onContinue: () -> Void = {}
 
     @Environment(\.dismiss) private var dismiss
@@ -55,7 +54,7 @@ struct RecoveryPhraseView: View {
         .tint(.brandTeal)
         .safeAreaInset(edge: .bottom) {
             Button(action: onContinue) {
-                Text("I've saved it — continue")
+                Text("I've saved")
                     .font(.headline)
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
@@ -125,7 +124,10 @@ struct RecoveryPhraseView: View {
 
 #Preview {
     NavigationStack {
-        RecoveryPhraseView(mnemonic: try! MockWalletService().createWallet())
+        RecoveryPhraseView(mnemonic: Mnemonic(words: [
+            "ocean", "target", "lemon", "puzzle", "garden", "velvet",
+            "ridge", "comfort", "anchor", "sunny", "marble", "falcon",
+        ]))
     }
     .preferredColorScheme(.dark)
 }
