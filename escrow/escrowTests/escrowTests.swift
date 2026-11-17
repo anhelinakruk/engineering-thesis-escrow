@@ -6,33 +6,34 @@
 //
 
 import XCTest
+import AlloySwift
 @testable import escrow
 
 final class escrowTests: XCTestCase {
 
-    override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
+    func testWeiFromEth() {
+        XCTAssertEqual(Wei.from(eth: "1"), "1000000000000000000")
+        XCTAssertEqual(Wei.from(eth: "0.5"), "500000000000000000")
+        XCTAssertEqual(Wei.from(eth: "0,82"), "820000000000000000")
+        XCTAssertEqual(Wei.from(eth: "0.000000000000000001"), "1")
+        XCTAssertEqual(Wei.from(eth: "123456.123456789012345678"), "123456123456789012345678")
+        XCTAssertNil(Wei.from(eth: ""))
+        XCTAssertNil(Wei.from(eth: "0"))
+        XCTAssertNil(Wei.from(eth: "-1"))
+        XCTAssertNil(Wei.from(eth: "abc"))
+        XCTAssertNil(Wei.from(eth: "0.0000000000000000001"))
     }
 
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
+    func testWeiToEth() {
+        XCTAssertEqual(Wei.toEth("500000000000000000"), Decimal(string: "0.5"))
+        XCTAssertEqual(Wei.toEth("0"), 0)
     }
 
-    func testExample() throws {
-        // This is an example of a functional test case.
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-        // Any test you write for XCTest can be annotated as throws and async.
-        // Mark your test throws to produce an unexpected failure when your test encounters an uncaught error.
-        // Mark your test async to allow awaiting for asynchronous code to complete. Check the results with assertions afterwards.
-        // XCTest Documentation
-        // https://developer.apple.com/documentation/xctest
+    func testRevertReasonIsExtracted() {
+        let error = AlloyError.ProviderError(
+            message: "server returned an error response: error code 3: execution reverted: only buyer can confirm, data: \"0x08c3\""
+        )
+        XCTAssertEqual(AlloyEscrowService.reason(error), "only buyer can confirm")
+        XCTAssertEqual(AlloyEscrowService.reason(.UrlError(message: "bad url")), "bad url")
     }
-
-    func testPerformanceExample() throws {
-        // This is an example of a performance test case.
-        self.measure {
-            // Put the code you want to measure the time of here.
-        }
-    }
-
 }

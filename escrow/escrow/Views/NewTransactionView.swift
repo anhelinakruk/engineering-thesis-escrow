@@ -3,9 +3,8 @@
 //  escrow
 //
 //  Presented as a sheet from the wallet home. The buyer sets an amount and an
-//  optional description, then locks the funds into a new escrow. Appearance
-//  only for now — "Create & lock funds" just dismisses; the real create-escrow
-//  call comes with the service layer.
+//  optional description, then locks the funds into a new escrow. Once it is
+//  on-chain the sheet turns into the invite preview, ready to share.
 //
 
 import SwiftUI
@@ -14,7 +13,9 @@ struct NewTransactionView: View {
     /// Rough USD price of 1 ETH, used only to show the live fiat estimate.
     private let usdPerEth = 3800.0
 
+    @EnvironmentObject private var vm: EscrowViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var created: Escrow?
     @State private var amount = ""
     @State private var details = ""
     @FocusState private var focusedField: Field?
@@ -30,6 +31,21 @@ struct NewTransactionView: View {
     }
 
     var body: some View {
+        if let created {
+            NavigationStack {
+                JoinTransactionView(escrow: created)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Done") { dismiss() }
+                        }
+                    }
+            }
+        } else {
+            form
+        }
+    }
+
+    private var form: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
@@ -53,12 +69,17 @@ struct NewTransactionView: View {
                 }
             }
             .tint(.brandTeal)
+            .escrowErrorAlert(vm)
             .safeAreaInset(edge: .bottom) {
                 Button {
-                    // TODO: call the service to create + fund the escrow.
-                    dismiss()
+                    focusedField = nil
+                    Task {
+                        guard let id = await vm.createEscrow(amountEth: amount) else { return }
+                        created = await vm.escrow(id: id)
+                        if created == nil { dismiss() }
+                    }
                 } label: {
-                    Text("Create & lock funds")
+                    Text(vm.isSending ? "Locking funds…" : "Create & lock funds")
                         .font(.headline)
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
@@ -69,8 +90,8 @@ struct NewTransactionView: View {
                     in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                 )
                 .shadow(color: Color.brandTeal.opacity(0.4), radius: 16, y: 4)
-                .opacity(amount.isEmpty ? 0.5 : 1)
-                .disabled(amount.isEmpty)
+                .opacity(amount.isEmpty || vm.isSending ? 0.5 : 1)
+                .disabled(amount.isEmpty || vm.isSending)
                 .padding(.horizontal, 24)
                 .padding(.bottom, 8)
             }
@@ -169,5 +190,6 @@ struct NewTransactionView: View {
 
 #Preview {
     NewTransactionView()
+        .environmentObject(EscrowViewModel())
         .preferredColorScheme(.dark)
 }

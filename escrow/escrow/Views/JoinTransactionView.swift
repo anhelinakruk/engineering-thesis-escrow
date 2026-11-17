@@ -3,28 +3,16 @@
 //  escrow
 //
 //  What the seller sees after opening the buyer's shared link: the escrow
-//  invitation. Reached via a deep link (not wired yet). Appearance only —
-//  "Join transaction" will call the service to join the escrow later.
+//  invitation. Reached via an `escrow://join/<id>` deep link. Without `onJoin`
+//  it is the buyer's preview of the same screen, with a share button instead.
 //
 
 import SwiftUI
 
 struct JoinTransactionView: View {
-    var onJoin: () -> Void = {}
-
-    // Sample invitation data; will come from the link / service.
-    private let inviterName = "Jan Nowak"
-    private let inviterInitials = "JN"
-    private let inviterColor = Color(red: 0.52, green: 0.40, blue: 0.85)
-    private let inviterAddress = "0×7F3a...9E2b"
-    private let amountEth = "0.82"
-    private let terms = "MacBook Pro 14, 2023, excellent condition. Local pickup, Warsaw, Mokotów."
-    private let usdPerEth = 3800.0
-
-    private var fiatText: String {
-        let usd = (Double(amountEth) ?? 0) * usdPerEth
-        return "≈ $" + usd.formatted(.number.precision(.fractionLength(2)))
-    }
+    @EnvironmentObject private var vm: EscrowViewModel
+    let escrow: Escrow
+    var onJoin: (() async -> Void)?
 
     var body: some View {
         ScrollView {
@@ -32,8 +20,7 @@ struct JoinTransactionView: View {
                 invitationHeader
                 amountCard
                 protectionBanner
-                termsSection
-                Text("Created by \(inviterName) · \(inviterAddress)")
+                Text("Escrow #\(escrow.id) · created by \(escrow.buyer.shortAddress)")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -42,12 +29,19 @@ struct JoinTransactionView: View {
         }
         .background(Color.appBackground)
         .safeAreaInset(edge: .bottom) {
-            Button(action: onJoin) {
-                Text("Join transaction")
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 17)
+            Group {
+                if let onJoin {
+                    Button {
+                        Task { await onJoin() }
+                    } label: {
+                        buttonLabel(vm.isSending ? "Joining…" : "Join transaction")
+                    }
+                    .disabled(vm.isSending)
+                } else {
+                    ShareLink(item: escrow.inviteURL) {
+                        buttonLabel("Share invite link")
+                    }
+                }
             }
             .background(
                 Color.brandTeal,
@@ -59,20 +53,24 @@ struct JoinTransactionView: View {
         }
     }
 
+    private func buttonLabel(_ title: String) -> some View {
+        Text(title)
+            .font(.headline)
+            .foregroundStyle(.white)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 17)
+    }
+
     private var invitationHeader: some View {
         VStack(spacing: 14) {
             Text("ESCROW INVITATION")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(Color.brandTeal)
 
-            Text(inviterInitials)
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(.white)
-                .frame(width: 72, height: 72)
-                .background(inviterColor, in: Circle())
+            AddressAvatar(address: escrow.buyer, size: 72)
 
             VStack(spacing: 4) {
-                Text(inviterName)
+                Text(escrow.buyer.shortAddress)
                     .font(.title2.weight(.bold))
                     .foregroundStyle(.white)
                 Text("invites you to a secure transaction")
@@ -87,10 +85,10 @@ struct JoinTransactionView: View {
             Text("TRANSACTION AMOUNT")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Text("\(amountEth) ETH")
+            Text("\(ethText(escrow.amountWei)) ETH")
                 .font(.system(size: 40, weight: .bold))
                 .foregroundStyle(.white)
-            Text(fiatText)
+            Text(fiatText(escrow.amountWei))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -127,26 +125,13 @@ struct JoinTransactionView: View {
                 .stroke(Color.brandTeal.opacity(0.6), lineWidth: 1)
         )
     }
-
-    private var termsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("TRANSACTION TERMS")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text(terms)
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(16)
-                .background(
-                    Color.white.opacity(0.04),
-                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                )
-        }
-    }
 }
 
 #Preview {
-    JoinTransactionView()
-        .preferredColorScheme(.dark)
+    JoinTransactionView(escrow: Escrow(
+        id: 7, buyer: "0x7F3a5b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e9E2b", seller: nil,
+        amountWei: "820000000000000000", state: .funded, shipDeadline: nil, confirmDeadline: nil
+    ))
+    .environmentObject(EscrowViewModel())
+    .preferredColorScheme(.dark)
 }

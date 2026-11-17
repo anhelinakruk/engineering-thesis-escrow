@@ -3,32 +3,42 @@
 //  escrow
 //
 //  Detail screen for a single escrow, pushed from the wallet list. Shows the
-//  state-machine progress, amount, counterparty, and description, plus the
-//  actions available in the current state. Appearance only for now.
+//  state-machine progress, amount and counterparty, plus the actions the
+//  contract allows for this user's role in the current state.
 //
 
 import SwiftUI
 
-struct TransactionDetailView: View {
-    let transaction: WalletTransaction
+/// A button the detail screen can show; every one maps to a contract call.
+private struct DetailAction: Identifiable {
+    let action: EscrowAction
+    let title: String
+    let confirmation: String
+    var id: String { title }
+}
 
-    var onConfirm: () -> Void = {}
-    var onDispute: () -> Void = {}
+struct TransactionDetailView: View {
+    @EnvironmentObject private var vm: EscrowViewModel
+    let escrow: Escrow
 
     private let steps = ["Created", "Funded", "Sent", "Completed"]
-    private let usdPerEth = 3800.0
-
-    private let details = "MacBook Pro 14, 2023, excellent condition. Local pickup, Warsaw, Mokotów."
 
     @State private var showingInviteLink = false
+    @State private var pendingAction: DetailAction?
+
+    /// The list refreshes after every action; show the fresh copy when there is one.
+    private var transaction: Escrow {
+        vm.escrows.first { $0.id == escrow.id } ?? escrow
+    }
+
+    private var isBuyer: Bool { transaction.isBuyer(vm.myAddress) }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 statusCard
                 amountCard
-                sellerSection
-                descriptionSection
+                counterpartySection
             }
             .padding(.horizontal, 24)
             .padding(.top, 8)
@@ -37,39 +47,67 @@ struct TransactionDetailView: View {
         .navigationTitle("Transaction")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showingInviteLink = true
-                } label: {
-                    Image(systemName: "link")
+            if isBuyer && transaction.seller == nil && transaction.state == .funded {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingInviteLink = true
+                    } label: {
+                        Image(systemName: "link")
+                    }
                 }
             }
         }
         .sheet(isPresented: $showingInviteLink) {
-            JoinTransactionView()
+            JoinTransactionView(escrow: transaction)
         }
+        .confirmationDialog(
+            pendingAction?.title ?? "",
+            isPresented: Binding(
+                get: { pendingAction != nil },
+                set: { if !$0 { pendingAction = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: pendingAction
+        ) { item in
+            Button(item.title) {
+                Task { await vm.perform(item.action, id: transaction.id) }
+            }
+        } message: { item in
+            Text(item.confirmation)
+        }
+        .escrowErrorAlert(vm)
         .safeAreaInset(edge: .bottom) {
-            if showsBuyerActions {
+            if primaryAction != nil || secondaryAction != nil {
                 VStack(spacing: 12) {
-                    Button(action: onConfirm) {
-                        Text("Confirm receipt")
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 17)
+                    if let primary = primaryAction {
+                        Button {
+                            pendingAction = primary
+                        } label: {
+                            Text(vm.isSending ? "Sending…" : primary.title)
+                                .font(.headline)
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 17)
+                        }
+                        .background(
+                            Color.brandTeal,
+                            in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        )
+                        .shadow(color: Color.brandTeal.opacity(0.4), radius: 16, y: 4)
                     }
-                    .background(
-                        Color.brandTeal,
-                        in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    )
-                    .shadow(color: Color.brandTeal.opacity(0.4), radius: 16, y: 4)
 
-                    Button(action: onDispute) {
-                        Text("Report a dispute")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Color(red: 0.90, green: 0.40, blue: 0.45))
+                    if let secondary = secondaryAction {
+                        Button {
+                            pendingAction = secondary
+                        } label: {
+                            Text(secondary.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Color(red: 0.90, green: 0.40, blue: 0.45))
+                        }
                     }
                 }
+                .disabled(vm.isSending)
+                .opacity(vm.isSending ? 0.6 : 1)
                 .padding(.horizontal, 24)
                 .padding(.bottom, 8)
             }
@@ -144,13 +182,13 @@ struct TransactionDetailView: View {
         VStack(alignment: .leading, spacing: 6) {
             label("AMOUNT")
             HStack(alignment: .center) {
-                Text("\(transaction.amountEth) ETH")
+                Text("\(ethText(transaction.amountWei)) ETH")
                     .font(.system(size: 28, weight: .bold))
                     .foregroundStyle(.white)
                 Spacer()
                 securedBadge
             }
-            Text(fiatText)
+            Text(fiatText(transaction.amountWei))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
@@ -173,22 +211,19 @@ struct TransactionDetailView: View {
         .background(Color.brandTeal.opacity(0.12), in: Capsule())
     }
 
-    // MARK: Seller / description
+    // MARK: Counterparty
 
-    private var sellerSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            label("SELLER")
+    private var counterpartySection: some View {
+        let other = transaction.counterparty(of: vm.myAddress)
+        return VStack(alignment: .leading, spacing: 10) {
+            label(isBuyer ? "SELLER" : "BUYER")
             HStack(spacing: 12) {
-                Text(transaction.initials)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 44, height: 44)
-                    .background(transaction.avatarColor, in: Circle())
+                AddressAvatar(address: other)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(transaction.name)
+                    Text(other?.shortAddress ?? "Waiting for the seller")
                         .font(.headline)
                         .foregroundStyle(.white)
-                    Text("0×7F3a...9E2b")
+                    Text(other == nil ? "Share the invite link to let them join" : "Escrow #\(transaction.id)")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -202,21 +237,6 @@ struct TransactionDetailView: View {
         }
     }
 
-    private var descriptionSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            label("DESCRIPTION")
-            Text(details)
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(16)
-                .background(
-                    Color.white.opacity(0.04),
-                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-                )
-        }
-    }
-
     private func label(_ text: String) -> some View {
         Text(text)
             .font(.caption)
@@ -226,46 +246,73 @@ struct TransactionDetailView: View {
     // MARK: Derived
 
     private var currentStep: Int {
-        switch transaction.status {
+        switch transaction.state {
         case .created: return 0
         case .funded: return 1
-        case .send, .shipped, .disputed: return 2
+        case .shipped, .disputed: return 2
         case .completed, .refunded: return 3
         }
     }
 
     private var statusTitle: String {
-        switch transaction.status {
-        case .send, .shipped: return "Sent"
-        default: return transaction.status.label
-        }
+        transaction.state.label
     }
 
     private var statusSubtitle: String {
-        switch transaction.status {
+        switch transaction.state {
         case .created: return "Escrow created. Waiting for the buyer to lock the funds."
+        case .funded where transaction.seller == nil: return "Funds are locked. Waiting for the seller to join."
         case .funded: return "Funds are locked. Waiting for the seller to ship the item."
-        case .send, .shipped: return "The seller has shipped the item. Once it arrives, confirm receipt to release the funds."
+        case .shipped: return "The seller has shipped the item. Once it arrives, confirm receipt to release the funds."
         case .completed: return "The deal is complete. The funds were released to the seller."
         case .refunded: return "The funds were returned to the buyer."
         case .disputed: return "A dispute is under review by the arbiter."
         }
     }
 
-    private var showsBuyerActions: Bool {
-        transaction.status == .send || transaction.status == .shipped
+    private func passed(_ deadline: Date?) -> Bool {
+        deadline.map { $0 <= .now } ?? false
     }
 
-    private var fiatText: String {
-        let eth = Double(transaction.amountEth) ?? 0
-        let usd = eth * usdPerEth
-        return "≈ $" + usd.formatted(.number.precision(.fractionLength(2)))
+    /// Mirrors the contract's require() checks so only callable actions show up.
+    private var primaryAction: DetailAction? {
+        switch (transaction.state, isBuyer) {
+        case (.funded, true) where transaction.seller == nil:
+            return DetailAction(action: .cancel, title: "Cancel escrow",
+                                confirmation: "Your funds will be returned to you for withdrawal.")
+        case (.funded, true) where passed(transaction.shipDeadline):
+            return DetailAction(action: .refundExpired, title: "Reclaim funds",
+                                confirmation: "The seller missed the shipping deadline. Your funds will be returned to you.")
+        case (.funded, false):
+            return DetailAction(action: .markShipped, title: "Mark as shipped",
+                                confirmation: "The buyer will have 7 days to confirm receipt.")
+        case (.shipped, true):
+            return DetailAction(action: .confirmReceipt, title: "Confirm receipt",
+                                confirmation: "The funds will be released to the seller. This cannot be undone.")
+        case (.shipped, false) where passed(transaction.confirmDeadline):
+            return DetailAction(action: .autoComplete, title: "Release funds",
+                                confirmation: "The buyer didn't confirm in time. The funds will be released to you.")
+        default:
+            return nil
+        }
+    }
+
+    private var secondaryAction: DetailAction? {
+        guard transaction.state == .shipped else { return nil }
+        return DetailAction(action: .raiseDispute, title: "Report a dispute",
+                            confirmation: "The arbiter will decide who receives the funds.")
     }
 }
 
 #Preview {
     NavigationStack {
-        TransactionDetailView(transaction: WalletTransaction.activeSamples[0])
+        TransactionDetailView(escrow: Escrow(
+            id: 7, buyer: "0x7F3a5b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e9E2b",
+            seller: "0x4b2c5b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e11aF",
+            amountWei: "820000000000000000", state: .shipped,
+            shipDeadline: nil, confirmDeadline: nil
+        ))
     }
+    .environmentObject(EscrowViewModel())
     .preferredColorScheme(.dark)
 }
