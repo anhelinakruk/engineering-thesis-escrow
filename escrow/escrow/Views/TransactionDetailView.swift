@@ -156,6 +156,7 @@ struct TransactionDetailView: View {
                         .font(.caption)
                         .fontWeight(index == currentStep ? .semibold : .regular)
                         .foregroundStyle(index == currentStep ? .white : .secondary)
+                        .fixedSize()
                 }
             }
         }
@@ -186,7 +187,9 @@ struct TransactionDetailView: View {
                     .font(.system(size: 28, weight: .bold))
                     .foregroundStyle(.white)
                 Spacer()
-                securedBadge
+                if [.funded, .shipped, .disputed].contains(transaction.state) {
+                    securedBadge
+                }
             }
             Text(fiatText(transaction.amountWei))
                 .font(.subheadline)
