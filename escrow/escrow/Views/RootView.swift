@@ -18,6 +18,7 @@ enum OnboardingRoute: Hashable {
 
 struct RootView: View {
     @StateObject private var vm = WalletViewModel()
+    @StateObject private var escrowVM = EscrowViewModel()
     @State private var path: [OnboardingRoute] = []
 
     var body: some View {
@@ -37,6 +38,7 @@ struct RootView: View {
                         path = []
                     })
                 }
+                .environmentObject(escrowVM)
             } else {
                 onboarding
             }
@@ -45,6 +47,8 @@ struct RootView: View {
         .preferredColorScheme(.dark)
         .buttonStyle(FlatButtonStyle())
         .task { vm.restoreSession() }
+        // A link opened before sign-in or unlock waits in `invite` until Home shows it.
+        .onOpenURL { url in Task { await escrowVM.open(url) } }
         .alert("Something went wrong", isPresented: errorBinding) {
             Button("OK", role: .cancel) {}
         } message: {

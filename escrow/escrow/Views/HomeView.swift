@@ -3,89 +3,47 @@
 //  escrow
 //
 //  The wallet home: balance, address, and the list of escrow transactions
-//  split into active and history. Appearance only for now — everything is fed
-//  by sample data; real values will come from the service layer later.
+//  split into active and history, all read from the chain.
 //
 
 import SwiftUI
 import UIKit
 
-enum TxStatus {
-    case send, created, funded, shipped, completed, refunded, disputed
-
-    var label: String {
-        switch self {
-        case .send: return "Send"
-        case .created: return "Created"
-        case .funded: return "Funded"
-        case .shipped: return "Shipped"
-        case .completed: return "Completed"
-        case .refunded: return "Refunded"
-        case .disputed: return "Disputed"
-        }
-    }
-
-    var color: Color {
-        switch self {
-        case .send, .completed: return Color(red: 0.36, green: 0.78, blue: 0.55)
-        case .funded: return Color(red: 0.55, green: 0.45, blue: 0.90)
-        case .created: return Color(red: 0.78, green: 0.62, blue: 0.45)
-        case .shipped: return Color(red: 0.40, green: 0.60, blue: 0.90)
-        case .refunded: return Color(red: 0.90, green: 0.40, blue: 0.45)
-        case .disputed: return Color(red: 0.90, green: 0.62, blue: 0.30)
-        }
-    }
-}
-
-struct WalletTransaction: Identifiable, Hashable {
-    let id = UUID()
-    let name: String
-    let item: String
-    let amountEth: String
-    let initials: String
-    let avatarColor: Color
-    let status: TxStatus
-}
-
-extension WalletTransaction {
-    static let activeSamples: [WalletTransaction] = [
-        .init(name: "Anna Kowalska", item: "MacBook Pro 14", amountEth: "0.82",
-              initials: "AK", avatarColor: Color(red: 0.30, green: 0.45, blue: 0.85), status: .send),
-        .init(name: "Tomasz Wiśniewski", item: "iPhone 15 Pro", amountEth: "0.45",
-              initials: "TW", avatarColor: Color(red: 0.52, green: 0.40, blue: 0.85), status: .funded),
-        .init(name: "Marek Zieliński", item: "Concert tickets", amountEth: "0.12",
-              initials: "MZ", avatarColor: Color(red: 0.35, green: 0.65, blue: 0.55), status: .created),
-    ]
-
-    static let historySamples: [WalletTransaction] = [
-        .init(name: "Karolina Nowak", item: "Sony A7 camera", amountEth: "1.10",
-              initials: "KN", avatarColor: Color(red: 0.60, green: 0.50, blue: 0.40), status: .completed),
-        .init(name: "Piotr Lewandowski", item: "Mountain bike", amountEth: "0.30",
-              initials: "PL", avatarColor: Color(red: 0.85, green: 0.35, blue: 0.65), status: .refunded),
-    ]
-}
-
 struct HomeView: View {
+    @EnvironmentObject private var vm: EscrowViewModel
     var onLogout: () -> Void = {}
 
-    private let address = "0×7F3a...9E2b"
     @State private var didCopyAddress = false
     @State private var showingNewTransaction = false
     @State private var showLogoutConfirm = false
+    @State private var showingReceive = false
+    @State private var showingSend = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 balanceSection
-                transactionSection(title: "ACTIVE", items: WalletTransaction.activeSamples)
-                transactionSection(title: "HISTORY", items: WalletTransaction.historySamples)
+                if Wei.toEth(vm.pendingWithdrawalWei) > 0 {
+                    claimBanner
+                }
+                if vm.escrows.isEmpty {
+                    emptyState
+                }
+                if !vm.active.isEmpty {
+                    transactionSection(title: "ACTIVE", items: vm.active)
+                }
+                if !vm.history.isEmpty {
+                    transactionSection(title: "HISTORY", items: vm.history)
+                }
             }
             .padding(.horizontal, 24)
             .padding(.top, 8)
         }
         .background(Color.appBackground)
-        .navigationDestination(for: WalletTransaction.self) { tx in
-            TransactionDetailView(transaction: tx)
+        .refreshable { await vm.refresh() }
+        .task { await vm.refresh() }
+        .navigationDestination(for: Escrow.self) { escrow in
+            TransactionDetailView(escrow: escrow)
         }
         .navigationTitle("Wallet")
         .navigationBarTitleDisplayMode(.large)
@@ -94,7 +52,7 @@ struct HomeView: View {
                 Button {
                     showLogoutConfirm = true
                 } label: {
-                    Text("JK")
+                    Text(String(vm.myAddress.dropFirst(2).prefix(2)).uppercased())
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Color.brandTeal)
                         .frame(width: 32, height: 32)
@@ -125,6 +83,21 @@ struct HomeView: View {
         .sheet(isPresented: $showingNewTransaction) {
             NewTransactionView()
         }
+        .sheet(item: $vm.invite) { escrow in
+            JoinTransactionView(escrow: escrow, onJoin: {
+                if await vm.perform(.join, id: escrow.id) {
+                    vm.invite = nil
+                }
+            })
+            .escrowErrorAlert(vm)
+        }
+        .sheet(isPresented: $showingReceive) {
+            ReceiveView(address: vm.myAddress)
+        }
+        .sheet(isPresented: $showingSend) {
+            SendView()
+        }
+        .escrowErrorAlert(vm)
         .sheet(isPresented: $showLogoutConfirm) {
             LogoutSheet(
                 onConfirm: {
@@ -144,19 +117,25 @@ struct HomeView: View {
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text("2.4810")
+                    Text(ethText(vm.balanceWei))
                         .font(.system(size: 44, weight: .bold))
                         .foregroundStyle(.white)
                     Text("ETH")
                         .font(.title2)
                         .foregroundStyle(.secondary)
                 }
-                Text("≈ $9,427.80")
+                Text(fiatText(vm.balanceWei))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
                 addressPill
                     .padding(.top, 6)
+
+                HStack(spacing: 10) {
+                    walletButton("Receive", systemImage: "arrow.down") { showingReceive = true }
+                    walletButton("Send", systemImage: "arrow.up") { showingSend = true }
+                }
+                .padding(.top, 4)
             }
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -167,17 +146,68 @@ struct HomeView: View {
         }
     }
 
+    private func walletButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(
+                    Color.white.opacity(0.06),
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                )
+        }
+    }
+
+    /// Funds released by finished escrows sit in the contract until claimed.
+    private var claimBanner: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "lock.open.fill")
+                .foregroundStyle(Color.brandTeal)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(ethText(vm.pendingWithdrawalWei)) ETH ready to claim")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                Text("From finished escrows")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            Button {
+                Task { await vm.withdraw() }
+            } label: {
+                Text(vm.isSending ? "Claiming…" : "Claim")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 16)
+                    .background(Color.brandTeal, in: Capsule())
+            }
+            .disabled(vm.isSending)
+        }
+        .padding(16)
+        .background(
+            Color.brandTeal.opacity(0.08),
+            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.brandTeal.opacity(0.6), lineWidth: 1)
+        )
+    }
+
     private var addressPill: some View {
         HStack(spacing: 10) {
             Circle()
                 .fill(Color(red: 0.36, green: 0.78, blue: 0.55))
                 .frame(width: 8, height: 8)
-            Text(address)
+            Text(vm.myAddress.shortAddress)
                 .font(.callout)
                 .foregroundStyle(.white)
             Spacer(minLength: 0)
             Button {
-                UIPasteboard.general.string = address
+                UIPasteboard.general.string = vm.myAddress
                 withAnimation { didCopyAddress = true }
             } label: {
                 Label(didCopyAddress ? "Copied" : "Copy",
@@ -200,7 +230,15 @@ struct HomeView: View {
 
     // MARK: Transactions
 
-    private func transactionSection(title: String, items: [WalletTransaction]) -> some View {
+    private var emptyState: some View {
+        Text(vm.isLoading ? "Loading…" : "No transactions yet. Create one and share the link with the seller.")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 24)
+    }
+
+    private func transactionSection(title: String, items: [Escrow]) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             sectionLabel(title)
 
@@ -226,19 +264,16 @@ struct HomeView: View {
         }
     }
 
-    private func transactionRow(_ tx: WalletTransaction) -> some View {
-        HStack(spacing: 12) {
-            Text(tx.initials)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.white)
-                .frame(width: 44, height: 44)
-                .background(tx.avatarColor, in: Circle())
+    private func transactionRow(_ tx: Escrow) -> some View {
+        let counterparty = tx.counterparty(of: vm.myAddress)
+        return HStack(spacing: 12) {
+            AddressAvatar(address: counterparty)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(tx.name)
+                Text(counterparty?.shortAddress ?? "Waiting for seller")
                     .font(.headline)
                     .foregroundStyle(.white)
-                Text(tx.item)
+                Text("Escrow #\(tx.id) · \(tx.isBuyer(vm.myAddress) ? "Buying" : "Selling")")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -246,14 +281,14 @@ struct HomeView: View {
             Spacer(minLength: 8)
 
             VStack(alignment: .trailing, spacing: 4) {
-                Text("\(tx.amountEth) ETH")
+                Text("\(ethText(tx.amountWei)) ETH")
                     .font(.headline)
                     .foregroundStyle(.white)
                 HStack(spacing: 5) {
                     Circle()
-                        .fill(tx.status.color)
+                        .fill(tx.state.color)
                         .frame(width: 6, height: 6)
-                    Text(tx.status.label)
+                    Text(tx.state.label)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -273,5 +308,6 @@ struct HomeView: View {
     NavigationStack {
         HomeView()
     }
+    .environmentObject(EscrowViewModel())
     .preferredColorScheme(.dark)
 }
