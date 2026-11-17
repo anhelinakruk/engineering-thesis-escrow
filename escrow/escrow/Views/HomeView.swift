@@ -16,11 +16,16 @@ struct HomeView: View {
     @State private var didCopyAddress = false
     @State private var showingNewTransaction = false
     @State private var showLogoutConfirm = false
+    @State private var showingReceive = false
+    @State private var showingSend = false
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 balanceSection
+                if Wei.toEth(vm.pendingWithdrawalWei) > 0 {
+                    claimBanner
+                }
                 if vm.escrows.isEmpty {
                     emptyState
                 }
@@ -86,6 +91,12 @@ struct HomeView: View {
             })
             .escrowErrorAlert(vm)
         }
+        .sheet(isPresented: $showingReceive) {
+            ReceiveView(address: vm.myAddress)
+        }
+        .sheet(isPresented: $showingSend) {
+            SendView()
+        }
         .escrowErrorAlert(vm)
         .sheet(isPresented: $showLogoutConfirm) {
             LogoutSheet(
@@ -119,6 +130,12 @@ struct HomeView: View {
 
                 addressPill
                     .padding(.top, 6)
+
+                HStack(spacing: 10) {
+                    walletButton("Receive", systemImage: "arrow.down") { showingReceive = true }
+                    walletButton("Send", systemImage: "arrow.up") { showingSend = true }
+                }
+                .padding(.top, 4)
             }
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -127,6 +144,57 @@ struct HomeView: View {
                 in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
         }
+    }
+
+    private func walletButton(_ title: String, systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(
+                    Color.white.opacity(0.06),
+                    in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                )
+        }
+    }
+
+    /// Funds released by finished escrows sit in the contract until claimed.
+    private var claimBanner: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "lock.open.fill")
+                .foregroundStyle(Color.brandTeal)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(ethText(vm.pendingWithdrawalWei)) ETH ready to claim")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                Text("From finished escrows")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            Button {
+                Task { await vm.withdraw() }
+            } label: {
+                Text(vm.isSending ? "Claiming…" : "Claim")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 16)
+                    .background(Color.brandTeal, in: Capsule())
+            }
+            .disabled(vm.isSending)
+        }
+        .padding(16)
+        .background(
+            Color.brandTeal.opacity(0.08),
+            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.brandTeal.opacity(0.6), lineWidth: 1)
+        )
     }
 
     private var addressPill: some View {

@@ -13,6 +13,7 @@ import AlloySwift
 enum EscrowError: Error, LocalizedError {
     case noWallet
     case invalidAmount
+    case invalidAddress
     /// The chain or the contract said no; carries its reason when there is one.
     case chain(String)
 
@@ -22,6 +23,8 @@ enum EscrowError: Error, LocalizedError {
             return "No wallet on this device."
         case .invalidAmount:
             return "Enter an amount greater than zero."
+        case .invalidAddress:
+            return "That isn't a valid Ethereum address."
         case .chain(let why):
             return why
         }
@@ -42,6 +45,8 @@ protocol EscrowService {
     func createEscrow(amountWei: String) async throws -> UInt64
     func perform(_ action: EscrowAction, id: UInt64) async throws
     func withdraw() async throws
+    /// Plain ETH transfer from the wallet to any address.
+    func transfer(to: EthAddress, amountWei: String) async throws
 }
 
 struct AlloyEscrowService: EscrowService {
@@ -99,6 +104,14 @@ struct AlloyEscrowService: EscrowService {
         let mnemonic = try mnemonic()
         _ = try await mapErrors {
             try await AlloySwift.withdraw(mnemonic: mnemonic, rpcUrl: rpcURL, contract: contract)
+        }
+    }
+
+    func transfer(to: EthAddress, amountWei: String) async throws {
+        guard isValidAddress(address: to) else { throw EscrowError.invalidAddress }
+        let mnemonic = try mnemonic()
+        _ = try await mapErrors {
+            try await transferEth(mnemonic: mnemonic, rpcUrl: rpcURL, to: to, amountWei: amountWei)
         }
     }
 

@@ -88,6 +88,16 @@ final class EscrowViewModel: ObservableObject {
         await send { try await service.withdraw() } != nil
     }
 
+    @discardableResult
+    func transfer(to address: String, amountEth: String) async -> Bool {
+        guard let wei = Wei.from(eth: amountEth) else {
+            errorMessage = EscrowError.invalidAmount.localizedDescription
+            return false
+        }
+        let to = address.trimmingCharacters(in: .whitespacesAndNewlines)
+        return await send { try await service.transfer(to: to, amountWei: wei) } != nil
+    }
+
     private func send<T>(_ work: () async throws -> T) async -> T? {
         isSending = true
         defer { isSending = false }
