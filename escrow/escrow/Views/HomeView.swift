@@ -273,9 +273,10 @@ struct HomeView: View {
                 Text(counterparty?.shortAddress ?? "Waiting for seller")
                     .font(.headline)
                     .foregroundStyle(.white)
-                Text("Escrow #\(tx.id) · \(tx.isBuyer(vm.myAddress) ? "Buying" : "Selling")")
+                Text("\(tx.isBuyer(vm.myAddress) ? "Buying" : "Selling") · \(tx.description ?? "Escrow #\(tx.id)")")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    .lineLimit(1)
             }
 
             Spacer(minLength: 8)

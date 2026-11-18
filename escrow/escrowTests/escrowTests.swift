@@ -36,4 +36,16 @@ final class escrowTests: XCTestCase {
         XCTAssertEqual(AlloyEscrowService.reason(error), "only buyer can confirm")
         XCTAssertEqual(AlloyEscrowService.reason(.UrlError(message: "bad url")), "bad url")
     }
+
+    func testInviteURLCarriesKey() {
+        var escrow = Escrow(id: 7, buyer: "0xabc", seller: nil, amountWei: "1",
+                            state: .funded, shipDeadline: nil, confirmDeadline: nil)
+        XCTAssertEqual(escrow.inviteURL.absoluteString, "escrow://join/7")
+
+        escrow.inviteKey = "qMJaOZ9PBqPgVj5j4"
+        let url = escrow.inviteURL
+        XCTAssertEqual(url.absoluteString, "escrow://join/7?k=qMJaOZ9PBqPgVj5j4")
+        XCTAssertEqual(url.host, "join")
+        XCTAssertEqual(url.lastPathComponent, "7")
+    }
 }

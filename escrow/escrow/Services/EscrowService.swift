@@ -2,9 +2,10 @@
 //  EscrowService.swift
 //  escrow
 //
-//  The boundary between the SwiftUI layer and the escrow contract. The work
-//  (ABI encoding, signing, RPC) happens in Rust via AlloySwift; this file only
-//  passes the Keychain-held mnemonic down and maps the results to app models.
+//  The boundary between the SwiftUI layer and the escrows. On-chain work
+//  (ABI encoding, signing, RPC) happens in Rust via AlloySwift; the deal
+//  descriptions come from the backend. This file passes the Keychain-held
+//  mnemonic / JWT down and maps the results to app models.
 //
 
 import Foundation
@@ -36,13 +37,17 @@ protocol EscrowService {
 
     // MARK: Reads
     func listEscrows() async throws -> [Escrow]
-    func escrow(id: UInt64) async throws -> Escrow
+    /// `inviteKey` comes from an invite link and unlocks the description for
+    /// someone who isn't a party yet.
+    func escrow(id: UInt64, inviteKey: String?) async throws -> Escrow
     func balanceWei() async throws -> String
     func pendingWithdrawalWei() async throws -> String
 
     // MARK: Writes
     /// Creates and funds a new escrow; returns the id to share with the seller.
     func createEscrow(amountWei: String) async throws -> UInt64
+    /// Write-once deal terms; only the escrow's buyer may set them.
+    func saveDescription(_ description: String, escrowId: UInt64) async throws
     func perform(_ action: EscrowAction, id: UInt64) async throws
     func withdraw() async throws
     /// Plain ETH transfer from the wallet to any address.
@@ -51,6 +56,7 @@ protocol EscrowService {
 
 struct AlloyEscrowService: EscrowService {
     private let keychain = KeychainStore(service: WalletKeychainKeys.service)
+    private let backend = BackendService()
     private let rpcURL = AppConfig.rpcURL
     private let contract = AppConfig.escrowContract
 
@@ -59,15 +65,43 @@ struct AlloyEscrowService: EscrowService {
     }
 
     func listEscrows() async throws -> [Escrow] {
-        try await mapErrors {
+        let escrows = try await mapErrors {
             try await listEscrowsFor(rpcUrl: rpcURL, contract: contract, address: myAddress)
                 .map(Escrow.init)
         }
+        return await withDescriptions(escrows)
     }
 
-    func escrow(id: UInt64) async throws -> Escrow {
-        try await mapErrors {
+    func escrow(id: UInt64, inviteKey: String?) async throws -> Escrow {
+        var escrow = try await mapErrors {
             Escrow(try await getEscrow(rpcUrl: rpcURL, contract: contract, id: id))
+        }
+        escrow = await withDescriptions([escrow])[0]
+        if escrow.description == nil, let inviteKey,
+           let token = keychain.read(WalletKeychainKeys.token) {
+            escrow.description = try? await backend.inviteDescription(escrowId: id, key: inviteKey, token: token)
+        }
+        return escrow
+    }
+
+    func saveDescription(_ description: String, escrowId: UInt64) async throws {
+        guard let token = keychain.read(WalletKeychainKeys.token) else {
+            throw EscrowError.noWallet
+        }
+        try await backend.saveDescription(escrowId: escrowId, description: description, token: token)
+    }
+
+    /// Descriptions are a nice-to-have: if the backend is unreachable the
+    /// escrows still show, just without their terms.
+    private func withDescriptions(_ escrows: [Escrow]) async -> [Escrow] {
+        guard let token = keychain.read(WalletKeychainKeys.token),
+              let descriptions = try? await backend.descriptions(escrowIds: escrows.map(\.id), token: token)
+        else { return escrows }
+        return escrows.map { escrow in
+            var escrow = escrow
+            escrow.description = descriptions[escrow.id]?.description
+            escrow.inviteKey = descriptions[escrow.id]?.inviteKey
+            return escrow
         }
     }
 

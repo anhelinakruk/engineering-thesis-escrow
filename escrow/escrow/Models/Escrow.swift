@@ -39,6 +39,11 @@ struct Escrow: Identifiable, Hashable {
     let state: EscrowState
     let shipDeadline: Date?
     let confirmDeadline: Date?
+    /// Deal terms written by the buyer; kept by the backend, not on-chain.
+    var description: String? = nil
+    /// Secret that lets the invite link's holder read `description`; the
+    /// backend hands it only to the buyer.
+    var inviteKey: String? = nil
 }
 
 /// Exact ETH <-> wei conversion. Decimal, not Double: amounts are money and
