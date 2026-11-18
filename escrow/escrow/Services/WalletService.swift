@@ -75,24 +75,3 @@ struct AlloyWalletService: WalletService {
         keychain.save(address, for: WalletKeychainKeys.address)
     }
 }
-
-// Mock
-struct MockWalletService: WalletService {
-    private static let sampleWords = [
-        "ocean", "target", "lemon", "puzzle", "garden", "velvet",
-        "ridge", "comfort", "anchor", "sunny", "marble", "falcon",
-        "harbor", "meadow", "copper", "ginger", "ladder", "orbit",
-        "pepper", "willow", "cactus", "tunnel", "marble", "nectar",
-        "pilot", "raven", "silver", "timber", "violet", "walnut",
-    ]
-
-    func createWallet() async throws -> Mnemonic {
-        let words = (0..<12).map { _ in Self.sampleWords.randomElement()! }
-        return Mnemonic(words: words)
-    }
-
-    func importWallet(phrase: String) async throws {
-        let words = phrase.split(whereSeparator: \.isWhitespace)
-        guard words.count == 12 else { throw WalletError.invalidPhrase }
-    }
-}

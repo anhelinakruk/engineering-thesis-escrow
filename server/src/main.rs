@@ -50,8 +50,6 @@ async fn main() {
         .route("/health", get(health))
         .route("/api/auth/nonce", get(auth::get_nonce))
         .route("/api/auth/verify", post(auth::verify_and_login))
-        .route("/api/transactions", post(save_transaction))
-        .route("/api/transactions/:wallet_id", get(get_transactions))
         .route("/api/escrows/descriptions", get(get_descriptions))
         .route(
             "/api/escrows/:id/description",
@@ -68,51 +66,6 @@ async fn main() {
 
 async fn health() -> &'static str {
     "ok"
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct SaveTransactionRequest {
-    wallet_id: String,
-    tx_hash: String,
-    from_address: String,
-    to_address: String,
-    amount: String,
-    chain_id: i64,
-}
-
-/// `POST /api/transactions` — record a transaction for the wallet. JWT-gated:
-/// the `Claims` extractor rejects the request unless a valid token is present.
-async fn save_transaction(
-    _claims: Claims,
-    State(state): State<AppState>,
-    Json(payload): Json<SaveTransactionRequest>,
-) -> impl IntoResponse {
-    match state
-        .save_transaction(
-            &payload.wallet_id,
-            &payload.tx_hash,
-            &payload.from_address,
-            &payload.to_address,
-            &payload.amount,
-            payload.chain_id,
-        )
-        .await
-    {
-        Ok(transaction) => (StatusCode::CREATED, Json(transaction)).into_response(),
-        Err(e) => internal_error(e),
-    }
-}
-
-/// `GET /api/transactions/:wallet_id` — the wallet's transaction history. JWT-gated.
-async fn get_transactions(
-    _claims: Claims,
-    State(state): State<AppState>,
-    Path(wallet_id): Path<String>,
-) -> impl IntoResponse {
-    match state.get_transactions_by_wallet(&wallet_id).await {
-        Ok(transactions) => (StatusCode::OK, Json(transactions)).into_response(),
-        Err(e) => internal_error(e),
-    }
 }
 
 const MAX_DESCRIPTION_CHARS: usize = 500;
