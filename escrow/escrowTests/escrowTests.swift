@@ -35,6 +35,11 @@ final class escrowTests: XCTestCase {
         )
         XCTAssertEqual(AlloyEscrowService.reason(error), "only buyer can confirm")
         XCTAssertEqual(AlloyEscrowService.reason(.UrlError(message: "bad url")), "bad url")
+        // Real text from Rust when the RPC node is down or unresolvable.
+        XCTAssertEqual(
+            AlloyEscrowService.reason(.ProviderError(message: "error sending request for url (http://127.0.0.1:8545/)")),
+            "Can't reach the Ethereum network. Check your internet connection and try again."
+        )
     }
 
     func testInviteURLCarriesKey() {
