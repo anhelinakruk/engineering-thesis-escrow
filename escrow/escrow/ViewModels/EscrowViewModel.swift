@@ -38,7 +38,9 @@ final class EscrowViewModel: ObservableObject {
         escrows.filter { [.completed, .refunded].contains($0.state) }
     }
 
-    func refresh() async {
+    /// `silent` is for background polling: a dropped connection shouldn't pop
+    /// an alert every few seconds; the next manual refresh reports it.
+    func refresh(silent: Bool = false) async {
         isLoading = true
         defer { isLoading = false }
         do {
@@ -47,7 +49,19 @@ final class EscrowViewModel: ObservableObject {
             async let pending = service.pendingWithdrawalWei()
             (escrows, balanceWei, pendingWithdrawalWei) = try await (list, balance, pending)
         } catch {
-            errorMessage = error.localizedDescription
+            if !silent { errorMessage = error.localizedDescription }
+        }
+    }
+
+    /// Keeps Home in sync with the chain while it is on screen, so the other
+    /// party's actions show up without a manual refresh. Ends when the view's
+    /// task is cancelled.
+    // ponytail: polling; switch to contract event subscriptions if 15 s lag matters.
+    func keepRefreshing(every seconds: Double = 15) async {
+        await refresh()
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(seconds))
+            await refresh(silent: true)
         }
     }
 

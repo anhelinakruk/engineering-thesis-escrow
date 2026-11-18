@@ -41,7 +41,7 @@ struct HomeView: View {
         }
         .background(Color.appBackground)
         .refreshable { await vm.refresh() }
-        .task { await vm.refresh() }
+        .task { await vm.keepRefreshing() }
         .navigationDestination(for: Escrow.self) { escrow in
             TransactionDetailView(escrow: escrow)
         }
