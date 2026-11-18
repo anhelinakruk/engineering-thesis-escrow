@@ -76,7 +76,7 @@ struct TransactionDetailView: View {
                 Task { await vm.perform(item.action, id: transaction.id) }
             }
         } message: { item in
-            Text(item.confirmation)
+            Text("\(item.confirmation)\n\n\(networkFeeNote)")
         }
         .escrowErrorAlert(vm)
         .safeAreaInset(edge: .bottom) {

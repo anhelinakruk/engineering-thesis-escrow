@@ -51,7 +51,7 @@ struct SendView: View {
                     }
                 }
             } message: {
-                Text("To \(recipient.shortAddress). Transfers can't be reversed.")
+                Text("To \(recipient.shortAddress). Transfers can't be reversed.\n\n\(networkFeeNote)")
             }
             .safeAreaInset(edge: .bottom) {
                 Button {

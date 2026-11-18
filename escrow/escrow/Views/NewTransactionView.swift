@@ -175,9 +175,12 @@ struct NewTransactionView: View {
                     .font(.headline)
                     .foregroundStyle(Color.brandTeal)
             }
-            Text("Your ETH will be locked in a smart contract. You get it back automatically if the deal doesn't go through.")
+            Text("Your ETH will be locked in a smart contract. If the seller doesn't join or ship in time, you can take it back.")
                 .font(.subheadline)
                 .foregroundStyle(.white)
+            Text("Creating the escrow: \(networkFeeNote)")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)

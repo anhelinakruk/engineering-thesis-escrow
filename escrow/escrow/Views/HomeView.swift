@@ -169,7 +169,7 @@ struct HomeView: View {
                 Text("\(ethText(vm.pendingWithdrawalWei)) ETH ready to claim")
                     .font(.headline)
                     .foregroundStyle(.white)
-                Text("From finished escrows")
+                Text("From finished escrows · small network fee")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
