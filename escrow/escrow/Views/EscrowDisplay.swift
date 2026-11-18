@@ -28,13 +28,6 @@ func ethText(_ wei: String) -> String {
 /// Shown before every action that sends a transaction (NFR11).
 let networkFeeNote = "This is an Ethereum transaction and costs a small network fee (gas)."
 
-/// Rough USD estimate shown under amounts.
-// ponytail: fixed price; fetch a live rate if the fiat line has to be accurate.
-func fiatText(_ wei: String) -> String {
-    let usd = Wei.toEth(wei) * 3800
-    return "≈ $" + usd.formatted(.number.precision(.fractionLength(2)))
-}
-
 struct AddressAvatar: View {
     let address: EthAddress?
     var size: CGFloat = 44

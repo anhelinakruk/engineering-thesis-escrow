@@ -194,9 +194,6 @@ struct TransactionDetailView: View {
                     securedBadge
                 }
             }
-            Text(fiatText(transaction.amountWei))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)

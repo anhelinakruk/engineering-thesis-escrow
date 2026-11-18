@@ -97,9 +97,6 @@ struct JoinTransactionView: View {
             Text("\(ethText(escrow.amountWei)) ETH")
                 .font(.system(size: 40, weight: .bold))
                 .foregroundStyle(.white)
-            Text(fiatText(escrow.amountWei))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 22)

@@ -124,9 +124,6 @@ struct HomeView: View {
                         .font(.title2)
                         .foregroundStyle(.secondary)
                 }
-                Text(fiatText(vm.balanceWei))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
 
                 addressPill
                     .padding(.top, 6)
