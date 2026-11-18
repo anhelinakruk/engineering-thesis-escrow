@@ -74,7 +74,7 @@ struct NewTransactionView: View {
                 Button {
                     focusedField = nil
                     Task {
-                        guard let id = await vm.createEscrow(amountEth: amount) else { return }
+                        guard let id = await vm.createEscrow(amountEth: amount, description: details) else { return }
                         created = await vm.escrow(id: id)
                         if created == nil { dismiss() }
                     }
@@ -153,6 +153,10 @@ struct NewTransactionView: View {
                     .scrollContentBackground(.hidden)
                     .frame(minHeight: 90)
                     .focused($focusedField, equals: .details)
+                    // The backend rejects longer terms; stop typing at the limit instead.
+                    .onChange(of: details) { _, new in
+                        if new.count > 500 { details = String(new.prefix(500)) }
+                    }
             }
             .padding(12)
             .background(

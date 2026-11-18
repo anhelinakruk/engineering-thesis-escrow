@@ -89,8 +89,16 @@ extension Escrow {
         isBuyer(me) ? seller : buyer
     }
 
+    /// The key rides along so the link's holder can read the terms.
     var inviteURL: URL {
-        URL(string: "escrow://join/\(id)")!
+        var components = URLComponents()
+        components.scheme = "escrow"
+        components.host = "join"
+        components.path = "/\(id)"
+        if let inviteKey {
+            components.queryItems = [URLQueryItem(name: "k", value: inviteKey)]
+        }
+        return components.url!
     }
 }
 

@@ -20,6 +20,9 @@ struct JoinTransactionView: View {
                 invitationHeader
                 amountCard
                 protectionBanner
+                if let terms = escrow.description {
+                    termsSection(terms)
+                }
                 Text("Escrow #\(escrow.id) · created by \(escrow.buyer.shortAddress)")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -99,6 +102,23 @@ struct JoinTransactionView: View {
             Color.white.opacity(0.04),
             in: RoundedRectangle(cornerRadius: 18, style: .continuous)
         )
+    }
+
+    private func termsSection(_ terms: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("TRANSACTION TERMS")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(terms)
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+                .background(
+                    Color.white.opacity(0.04),
+                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                )
+        }
     }
 
     private var protectionBanner: some View {

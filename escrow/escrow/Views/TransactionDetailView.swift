@@ -39,6 +39,9 @@ struct TransactionDetailView: View {
                 statusCard
                 amountCard
                 counterpartySection
+                if let description = transaction.description {
+                    descriptionSection(description)
+                }
             }
             .padding(.horizontal, 24)
             .padding(.top, 8)
@@ -237,6 +240,21 @@ struct TransactionDetailView: View {
                 Color.white.opacity(0.04),
                 in: RoundedRectangle(cornerRadius: 16, style: .continuous)
             )
+        }
+    }
+
+    private func descriptionSection(_ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            label("DESCRIPTION")
+            Text(text)
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+                .background(
+                    Color.white.opacity(0.04),
+                    in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                )
         }
     }
 

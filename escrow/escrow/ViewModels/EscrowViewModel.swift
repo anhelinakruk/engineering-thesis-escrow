@@ -51,30 +51,50 @@ final class EscrowViewModel: ObservableObject {
         }
     }
 
-    func escrow(id: UInt64) async -> Escrow? {
+    func escrow(id: UInt64, inviteKey: String? = nil) async -> Escrow? {
         do {
-            return try await service.escrow(id: id)
+            return try await service.escrow(id: id, inviteKey: inviteKey)
         } catch {
             errorMessage = error.localizedDescription
             return nil
         }
     }
 
-    /// Handles `escrow://join/<id>`; anything else is ignored.
+    /// Handles `escrow://join/<id>?k=<invite key>`; anything else is ignored.
     func open(_ url: URL) async {
         guard url.scheme == "escrow", url.host == "join",
               let id = UInt64(url.lastPathComponent)
         else { return }
-        invite = await escrow(id: id)
+        let key = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?.first { $0.name == "k" }?.value
+        invite = await escrow(id: id, inviteKey: key)
     }
 
     /// Returns the new escrow's id, or nil if it failed (errorMessage is set).
-    func createEscrow(amountEth: String) async -> UInt64? {
+    /// A failed description save doesn't undo the escrow: the funds are
+    /// already locked, so the user gets the id plus a warning.
+    func createEscrow(amountEth: String, description: String) async -> UInt64? {
         guard let wei = Wei.from(eth: amountEth) else {
             errorMessage = EscrowError.invalidAmount.localizedDescription
             return nil
         }
-        return await send { try await service.createEscrow(amountWei: wei) }
+        let terms = description.trimmingCharacters(in: .whitespacesAndNewlines)
+        var descriptionError: Error?
+        let id = await send {
+            let id = try await service.createEscrow(amountWei: wei)
+            if !terms.isEmpty {
+                do {
+                    try await service.saveDescription(terms, escrowId: id)
+                } catch {
+                    descriptionError = error
+                }
+            }
+            return id
+        }
+        if let descriptionError {
+            errorMessage = "Escrow created, but its description couldn't be saved: \(descriptionError.localizedDescription)"
+        }
+        return id
     }
 
     /// Returns true on success.
