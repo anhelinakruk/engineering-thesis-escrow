@@ -47,15 +47,19 @@ final class EscrowViewModel: ObservableObject {
             async let list = service.listEscrows()
             async let balance = service.balanceWei()
             async let pending = service.pendingWithdrawalWei()
-            (escrows, balanceWei, pendingWithdrawalWei) = try await (list, balance, pending)
+            let fresh = try await (list, balance, pending)
+            // A cancelled refresh may have lost its backend call (descriptions)
+            // while the chain read finished; don't publish that half result.
+            guard !Task.isCancelled else { return }
+            (escrows, balanceWei, pendingWithdrawalWei) = fresh
         } catch {
             if !silent { errorMessage = error.localizedDescription }
         }
     }
 
-    /// Keeps Home in sync with the chain while it is on screen, so the other
-    /// party's actions show up without a manual refresh. Ends when the view's
-    /// task is cancelled.
+    /// Keeps the signed-in screens (Home and Detail) in sync with the chain,
+    /// so the other party's actions show up without a manual refresh. Ends
+    /// when the owning task is cancelled (lock, logout).
     // ponytail: polling; switch to contract event subscriptions if 15 s lag matters.
     func keepRefreshing(every seconds: Double = 15) async {
         await refresh()

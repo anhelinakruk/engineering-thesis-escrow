@@ -10,6 +10,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use alloy::primitives::Address;
 use db::AppState;
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
@@ -50,6 +51,7 @@ async fn main() {
         .route("/health", get(health))
         .route("/api/auth/nonce", get(auth::get_nonce))
         .route("/api/auth/verify", post(auth::verify_and_login))
+        .route("/api/auth/me", get(auth::me))
         .route("/api/escrows/descriptions", get(get_descriptions))
         .route(
             "/api/escrows/:id/description",
@@ -111,11 +113,8 @@ async fn save_description(
         Ok((buyer, _)) => buyer,
         Err(e) => return internal_error(e),
     };
-    if buyer.is_zero() {
-        return error(StatusCode::NOT_FOUND, "escrow does not exist");
-    }
-    if buyer.to_string().to_lowercase() != caller.to_lowercase() {
-        return error(StatusCode::FORBIDDEN, "only the buyer can describe the escrow");
+    if let Err((status, why)) = check_can_describe(&caller, buyer) {
+        return error(status, why);
     }
 
     match state.has_description(escrow_id).await {
@@ -127,6 +126,40 @@ async fn save_description(
     match state.save_description(escrow_id, description, &invite_key).await {
         Ok(()) => StatusCode::CREATED.into_response(),
         Err(e) => internal_error(e),
+    }
+}
+
+fn is(address: Address, caller: &str) -> bool {
+    address.to_string().eq_ignore_ascii_case(caller)
+}
+
+/// Only the escrow's on-chain buyer may attach its terms.
+fn check_can_describe(caller: &str, buyer: Address) -> Result<(), (StatusCode, &'static str)> {
+    if buyer.is_zero() {
+        return Err((StatusCode::NOT_FOUND, "escrow does not exist"));
+    }
+    if !is(buyer, caller) {
+        return Err((StatusCode::FORBIDDEN, "only the buyer can describe the escrow"));
+    }
+    Ok(())
+}
+
+#[derive(Debug, PartialEq)]
+enum Reader {
+    /// Also gets the invite key, to build the link for the seller.
+    Buyer,
+    Seller,
+}
+
+/// Who may read an escrow's terms from the list endpoint: its two parties.
+/// Anyone else (including a seller-to-be) needs the invite key instead.
+fn description_reader(caller: &str, buyer: Address, seller: Address) -> Option<Reader> {
+    if is(buyer, caller) {
+        Some(Reader::Buyer)
+    } else if !seller.is_zero() && is(seller, caller) {
+        Some(Reader::Seller)
+    } else {
+        None
     }
 }
 
@@ -181,13 +214,11 @@ async fn get_descriptions(
                 Ok(parties) => parties,
                 Err(e) => return internal_error(e),
             };
-        let is_buyer = buyer.to_string().to_lowercase() == caller;
-        let is_seller = !seller.is_zero() && seller.to_string().to_lowercase() == caller;
-        if is_buyer || is_seller {
+        if let Some(reader) = description_reader(&caller, buyer, seller) {
             visible.push(DescriptionResponse {
                 escrow_id: row.escrow_id,
                 description: row.description,
-                invite_key: is_buyer.then_some(row.invite_key),
+                invite_key: (reader == Reader::Buyer).then_some(row.invite_key),
             });
         }
     }
@@ -250,5 +281,39 @@ mod tests {
         assert!(validate_description(&"a".repeat(501)).is_err());
         // Counted in characters, not bytes: 500 Polish letters are fine.
         assert!(validate_description(&"ż".repeat(500)).is_ok());
+    }
+
+    const BUYER: Address = Address::repeat_byte(0xb0);
+    const SELLER: Address = Address::repeat_byte(0x5e);
+    const STRANGER: &str = "0x9965507d1a55bcc2695c58ba16fb37d819b0a4dc";
+
+    fn lower(a: Address) -> String {
+        a.to_string().to_lowercase()
+    }
+
+    #[test]
+    fn only_the_buyer_can_describe() {
+        assert_eq!(check_can_describe(&lower(BUYER), BUYER), Ok(()));
+        // Checksummed and lowercase addresses are the same account.
+        assert_eq!(check_can_describe(&BUYER.to_string(), BUYER), Ok(()));
+        assert_eq!(
+            check_can_describe(&lower(SELLER), BUYER).unwrap_err().0,
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(check_can_describe(STRANGER, BUYER).unwrap_err().0, StatusCode::FORBIDDEN);
+        assert_eq!(
+            check_can_describe(&lower(BUYER), Address::ZERO).unwrap_err().0,
+            StatusCode::NOT_FOUND
+        );
+    }
+
+    #[test]
+    fn only_parties_read_descriptions_and_only_the_buyer_gets_the_key() {
+        assert_eq!(description_reader(&lower(BUYER), BUYER, SELLER), Some(Reader::Buyer));
+        assert_eq!(description_reader(&lower(SELLER), BUYER, SELLER), Some(Reader::Seller));
+        assert_eq!(description_reader(STRANGER, BUYER, SELLER), None);
+        // Before anyone joins, the seller slot is zero; nobody matches it.
+        assert_eq!(description_reader(&lower(SELLER), BUYER, Address::ZERO), None);
+        assert_eq!(description_reader(&lower(Address::ZERO), BUYER, Address::ZERO), None);
     }
 }

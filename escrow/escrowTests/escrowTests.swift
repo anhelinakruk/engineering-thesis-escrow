@@ -47,6 +47,17 @@ final class escrowTests: XCTestCase {
         )
     }
 
+    func testJWTRenewal() {
+        // {"alg":"HS256","typ":"JWT"} . {"exp":1700000000,"sub":"user:x"} . signature
+        let token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MDAwMDAwMDAsInN1YiI6InVzZXI6eCJ9.sig"
+        let expiry = Date(timeIntervalSince1970: 1_700_000_000)
+        XCTAssertEqual(JWT.expiry(of: token), expiry)
+        XCTAssertFalse(JWT.needsRenewal(token, now: expiry.addingTimeInterval(-3600)))
+        XCTAssertTrue(JWT.needsRenewal(token, now: expiry.addingTimeInterval(-30)))
+        XCTAssertTrue(JWT.needsRenewal(token, now: expiry.addingTimeInterval(3600)))
+        XCTAssertTrue(JWT.needsRenewal("not-a-jwt"))
+    }
+
     func testInviteURLCarriesKey() {
         var escrow = Escrow(id: 7, buyer: "0xabc", seller: nil, amountWei: "1",
                             state: .funded, shipDeadline: nil, confirmDeadline: nil)

@@ -44,14 +44,21 @@ struct SendView: View {
             }
             .tint(.brandTeal)
             .escrowErrorAlert(vm)
-            .confirmationDialog("Send \(amount) ETH?", isPresented: $confirming, titleVisibility: .visible) {
-                Button("Send") {
-                    Task {
-                        if await vm.transfer(to: recipient, amountEth: amount) { dismiss() }
-                    }
-                }
-            } message: {
-                Text("To \(recipient.shortAddress). Transfers can't be reversed.\n\n\(networkFeeNote)")
+            .sheet(isPresented: $confirming) {
+                ConfirmSheet(
+                    icon: "arrow.up.circle",
+                    title: "Send \(amount) ETH?",
+                    message: "To \(recipient.shortAddress). Transfers can't be undone.",
+                    confirmTitle: "Send",
+                    sendsTransaction: true,
+                    onConfirm: {
+                        confirming = false
+                        Task {
+                            if await vm.transfer(to: recipient, amountEth: amount) { dismiss() }
+                        }
+                    },
+                    onCancel: { confirming = false }
+                )
             }
             .safeAreaInset(edge: .bottom) {
                 Button {

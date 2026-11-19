@@ -41,7 +41,6 @@ struct HomeView: View {
         }
         .background(Color.appBackground)
         .refreshable { await vm.refresh() }
-        .task { await vm.keepRefreshing() }
         .navigationDestination(for: Escrow.self) { escrow in
             TransactionDetailView(escrow: escrow)
         }
@@ -99,7 +98,12 @@ struct HomeView: View {
         }
         .escrowErrorAlert(vm)
         .sheet(isPresented: $showLogoutConfirm) {
-            LogoutSheet(
+            ConfirmSheet(
+                icon: "rectangle.portrait.and.arrow.right",
+                title: "Log out of this wallet?",
+                message: "Make sure you've saved your recovery phrase — it's the only way to restore this wallet.",
+                confirmTitle: "Log out",
+                isDestructive: true,
                 onConfirm: {
                     showLogoutConfirm = false
                     onLogout()
@@ -267,7 +271,7 @@ struct HomeView: View {
             AddressAvatar(address: counterparty)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(counterparty?.shortAddress ?? "Waiting for seller")
+                Text(counterparty?.shortAddress ?? (tx.state == .funded ? "Waiting for seller" : "No seller joined"))
                     .font(.headline)
                     .foregroundStyle(.white)
                 Text("\(tx.isBuyer(vm.myAddress) ? "Buying" : "Selling") · \(tx.description ?? "Escrow #\(tx.id)")")
