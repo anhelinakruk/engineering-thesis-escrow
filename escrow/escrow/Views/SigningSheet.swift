@@ -97,11 +97,19 @@ struct SigningSheet: View {
             Text("MESSAGE")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Text(message)
-                .font(.system(.footnote, design: .monospaced))
-                .foregroundStyle(.white)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            // Line by line so the address line can stay unbroken (see ReceiveView).
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(message.components(separatedBy: "\n").enumerated()), id: \.offset) { _, line in
+                    let isAddress = line.hasPrefix("0x")
+                    Text(line.isEmpty ? " " : line)
+                        .lineLimit(isAddress ? 1 : nil)
+                        .minimumScaleFactor(isAddress ? 0.5 : 1)
+                }
+            }
+            .font(.system(.footnote, design: .monospaced))
+            .foregroundStyle(.white)
+            .textSelection(.enabled)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)

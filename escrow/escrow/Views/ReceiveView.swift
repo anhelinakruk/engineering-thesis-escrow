@@ -28,10 +28,13 @@ struct ReceiveView: View {
                         .background(.white, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
 
+                // One line, shrunk to fit: wrapping would let iOS hyphenate
+                // the address, and a hyphen in it reads as a different address.
                 Text(address)
                     .font(.callout.monospaced())
                     .foregroundStyle(.white)
-                    .multilineTextAlignment(.center)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
                     .textSelection(.enabled)
 
                 Button {
