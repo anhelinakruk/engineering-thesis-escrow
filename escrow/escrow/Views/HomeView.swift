@@ -266,7 +266,7 @@ struct HomeView: View {
             AddressAvatar(address: counterparty)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(counterparty?.shortAddress ?? "Waiting for seller")
+                Text(counterparty?.shortAddress ?? (tx.state == .funded ? "Waiting for seller" : "No seller joined"))
                     .font(.headline)
                     .foregroundStyle(.white)
                 Text("\(tx.isBuyer(vm.myAddress) ? "Buying" : "Selling") · \(tx.description ?? "Escrow #\(tx.id)")")

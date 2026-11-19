@@ -21,7 +21,10 @@ struct TransactionDetailView: View {
     @EnvironmentObject private var vm: EscrowViewModel
     let escrow: Escrow
 
-    private let steps = ["Created", "Funded", "Sent", "Completed"]
+    /// The last step names how the deal ended.
+    private var steps: [String] {
+        ["Created", "Funded", "Sent", transaction.state == .refunded ? "Refunded" : "Completed"]
+    }
 
     @State private var showingInviteLink = false
     @State private var pendingAction: DetailAction?
@@ -32,6 +35,9 @@ struct TransactionDetailView: View {
     }
 
     private var isBuyer: Bool { transaction.isBuyer(vm.myAddress) }
+
+    /// Still accepting a seller: funded and nobody has joined.
+    private var isOpen: Bool { transaction.state == .funded }
 
     var body: some View {
         ScrollView {
@@ -148,7 +154,7 @@ struct TransactionDetailView: View {
             ForEach(Array(steps.enumerated()), id: \.offset) { index, label in
                 if index > 0 {
                     Rectangle()
-                        .fill(index <= currentStep ? Color.brandTeal : Color.white.opacity(0.15))
+                        .fill(reached(index) && reached(index - 1) ? Color.brandTeal : Color.white.opacity(0.15))
                         .frame(height: 2)
                         .frame(maxWidth: .infinity)
                         .padding(.top, 13)
@@ -168,9 +174,9 @@ struct TransactionDetailView: View {
     private func stepCircle(index: Int) -> some View {
         ZStack {
             Circle()
-                .fill(index <= currentStep ? Color.brandTeal : Color.white.opacity(0.15))
+                .fill(reached(index) ? Color.brandTeal : Color.white.opacity(0.15))
                 .frame(width: 28, height: 28)
-            if index < currentStep {
+            if reached(index) && index < currentStep {
                 Image(systemName: "checkmark")
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(.white)
@@ -223,10 +229,10 @@ struct TransactionDetailView: View {
             HStack(spacing: 12) {
                 AddressAvatar(address: other)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(other?.shortAddress ?? "Waiting for the seller")
+                    Text(other?.shortAddress ?? (isOpen ? "Waiting for the seller" : "No seller joined"))
                         .font(.headline)
                         .foregroundStyle(.white)
-                    Text(other == nil ? "Share the invite link to let them join" : "Escrow #\(transaction.id)")
+                    Text(other == nil && isOpen ? "Share the invite link to let them join" : "Escrow #\(transaction.id)")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -262,6 +268,12 @@ struct TransactionDetailView: View {
     }
 
     // MARK: Derived
+
+    /// A cancelled or expired escrow skips "Sent"; the contract sets the
+    /// confirm deadline only when the seller ships, so it marks that step.
+    private func reached(_ index: Int) -> Bool {
+        index <= currentStep && (index != 2 || transaction.confirmDeadline != nil)
+    }
 
     private var currentStep: Int {
         switch transaction.state {
