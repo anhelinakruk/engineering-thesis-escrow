@@ -54,7 +54,7 @@ struct RecoveryPhraseView: View {
         .tint(.brandTeal)
         .safeAreaInset(edge: .bottom) {
             Button(action: onContinue) {
-                Text("I've saved")
+                Text("I've saved it")
                     .font(.headline)
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
