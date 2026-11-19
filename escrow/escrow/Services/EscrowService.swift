@@ -176,6 +176,9 @@ struct AlloyEscrowService: EscrowService {
         if message.contains("error sending request") {
             return "Can't reach the Ethereum network. Check your internet connection and try again."
         }
+        if message.contains("OutOfFunds") || message.contains("insufficient funds") {
+            return "Not enough ETH in your wallet to cover this amount plus the network fee."
+        }
         guard let start = message.range(of: "execution reverted: ") else {
             return message
         }
