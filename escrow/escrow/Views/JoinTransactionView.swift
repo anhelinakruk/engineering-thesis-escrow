@@ -23,6 +23,12 @@ struct JoinTransactionView: View {
                 if let terms = escrow.description {
                     termsSection(terms)
                 }
+                if onJoin != nil {
+                    Text("Joining: \(networkFeeNote)")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
                 Text("Escrow #\(escrow.id) · created by \(escrow.buyer.shortAddress)")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
@@ -91,9 +97,6 @@ struct JoinTransactionView: View {
             Text("\(ethText(escrow.amountWei)) ETH")
                 .font(.system(size: 40, weight: .bold))
                 .foregroundStyle(.white)
-            Text(fiatText(escrow.amountWei))
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 22)
@@ -130,7 +133,7 @@ struct JoinTransactionView: View {
                     .font(.headline)
                     .foregroundStyle(Color.brandTeal)
             }
-            Text("The funds are already secured in a smart contract. You'll receive them automatically once the buyer confirms receipt.")
+            Text("The funds are already locked in a smart contract. Once the buyer confirms receipt they are released to you, ready to claim in your wallet.")
                 .font(.subheadline)
                 .foregroundStyle(.white)
         }

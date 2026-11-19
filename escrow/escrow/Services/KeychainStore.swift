@@ -30,6 +30,9 @@ struct KeychainStore {
             kSecAttrService as String: service,
             kSecAttrAccount as String: key,
             kSecValueData as String: data,
+            // ThisDeviceOnly keeps the secrets out of backups and device
+            // migration, so the recovery phrase never leaves this phone (NFR1).
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlockedThisDeviceOnly,
         ]
         SecItemDelete(query as CFDictionary)
         SecItemAdd(query as CFDictionary, nil)

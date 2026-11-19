@@ -35,6 +35,16 @@ final class escrowTests: XCTestCase {
         )
         XCTAssertEqual(AlloyEscrowService.reason(error), "only buyer can confirm")
         XCTAssertEqual(AlloyEscrowService.reason(.UrlError(message: "bad url")), "bad url")
+        // Real text from Sepolia when the amount plus fee exceeds the balance.
+        XCTAssertEqual(
+            AlloyEscrowService.reason(.ProviderError(message: "server returned an error response: error code -32003: EVM error: OutOfFunds")),
+            "Not enough ETH in your wallet to cover this amount plus the network fee."
+        )
+        // Real text from Rust when the RPC node is down or unresolvable.
+        XCTAssertEqual(
+            AlloyEscrowService.reason(.ProviderError(message: "error sending request for url (http://127.0.0.1:8545/)")),
+            "Can't reach the Ethereum network. Check your internet connection and try again."
+        )
     }
 
     func testInviteURLCarriesKey() {

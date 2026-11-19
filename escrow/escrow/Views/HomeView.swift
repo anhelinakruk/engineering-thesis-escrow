@@ -41,7 +41,7 @@ struct HomeView: View {
         }
         .background(Color.appBackground)
         .refreshable { await vm.refresh() }
-        .task { await vm.refresh() }
+        .task { await vm.keepRefreshing() }
         .navigationDestination(for: Escrow.self) { escrow in
             TransactionDetailView(escrow: escrow)
         }
@@ -124,9 +124,6 @@ struct HomeView: View {
                         .font(.title2)
                         .foregroundStyle(.secondary)
                 }
-                Text(fiatText(vm.balanceWei))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
 
                 addressPill
                     .padding(.top, 6)
@@ -169,7 +166,7 @@ struct HomeView: View {
                 Text("\(ethText(vm.pendingWithdrawalWei)) ETH ready to claim")
                     .font(.headline)
                     .foregroundStyle(.white)
-                Text("From finished escrows")
+                Text("From finished escrows · small network fee")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

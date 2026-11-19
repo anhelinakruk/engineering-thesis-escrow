@@ -10,9 +10,6 @@
 import SwiftUI
 
 struct NewTransactionView: View {
-    /// Rough USD price of 1 ETH, used only to show the live fiat estimate.
-    private let usdPerEth = 3800.0
-
     @EnvironmentObject private var vm: EscrowViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var created: Escrow?
@@ -22,12 +19,6 @@ struct NewTransactionView: View {
 
     private enum Field {
         case amount, details
-    }
-
-    private var fiatText: String {
-        let eth = Double(amount.replacingOccurrences(of: ",", with: ".")) ?? 0
-        let usd = eth * usdPerEth
-        return "≈ $" + usd.formatted(.number.precision(.fractionLength(2)))
     }
 
     var body: some View {
@@ -117,9 +108,6 @@ struct NewTransactionView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Text(fiatText)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 24)
@@ -175,9 +163,12 @@ struct NewTransactionView: View {
                     .font(.headline)
                     .foregroundStyle(Color.brandTeal)
             }
-            Text("Your ETH will be locked in a smart contract. You get it back automatically if the deal doesn't go through.")
+            Text("Your ETH will be locked in a smart contract. If the seller doesn't join or ship in time, you can take it back.")
                 .font(.subheadline)
                 .foregroundStyle(.white)
+            Text("Creating the escrow: \(networkFeeNote)")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)

@@ -4,7 +4,7 @@
 //
 //  Environment-dependent settings. The simulator can reach the backend on
 //  localhost; a physical device must use the Mac's LAN IP (both on the same
-//  Wi-Fi). Chain is the Sepolia testnet.
+//  Wi-Fi). The chain is switched with `network`.
 //
 
 import Foundation
@@ -22,12 +22,33 @@ enum AppConfig {
         #endif
     }
 
-    /// Sepolia testnet.
-    static let chainId: Int = 11155111
+    enum Network {
+        case anvil, sepolia
+    }
 
-    // ponytail: local Anvil chain for development (contract from
-    // contracts/script/Deploy.s.sol on a fresh `anvil`); switch both to
-    // Sepolia once the contract is deployed there.
-    static let rpcURL = "http://127.0.0.1:8545"
-    static let escrowContract = "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+    /// The chain the app talks to. `.anvil` needs a local `anvil` with the
+    /// contract from contracts/script/Deploy.s.sol; `.sepolia` needs
+    /// Secrets.swift (copy escrow/Secrets.example.swift).
+    static let network: Network = .sepolia
+
+    static var chainId: Int {
+        switch network {
+        case .anvil: return 31337
+        case .sepolia: return 11155111
+        }
+    }
+
+    static var rpcURL: String {
+        switch network {
+        case .anvil: return "http://127.0.0.1:8545"
+        case .sepolia: return Secrets.sepoliaRPCURL
+        }
+    }
+
+    static var escrowContract: String {
+        switch network {
+        case .anvil: return "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+        case .sepolia: return "0x9c5776bcF1f1eA263D35a73Eca07112ff132EA12"
+        }
+    }
 }

@@ -157,7 +157,8 @@ struct AlloyEscrowService: EscrowService {
     }
 
     /// Rust errors arrive as one long provider string; keep only the
-    /// contract's revert reason (e.g. "only buyer can confirm") when present.
+    /// contract's revert reason (e.g. "only buyer can confirm") when present,
+    /// and turn an unreachable node into something a user can act on (NFR7).
     private func mapErrors<T>(_ work: () async throws -> T) async throws -> T {
         do {
             return try await work()
@@ -171,6 +172,12 @@ struct AlloyEscrowService: EscrowService {
         switch error {
         case .MnemonicError(let m), .AddressError(let m), .UrlError(let m), .ProviderError(let m):
             message = m
+        }
+        if message.contains("error sending request") {
+            return "Can't reach the Ethereum network. Check your internet connection and try again."
+        }
+        if message.contains("OutOfFunds") || message.contains("insufficient funds") {
+            return "Not enough ETH in your wallet to cover this amount plus the network fee."
         }
         guard let start = message.range(of: "execution reverted: ") else {
             return message
