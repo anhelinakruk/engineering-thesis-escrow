@@ -3,7 +3,11 @@ services:
     container_name: escrow-surrealdb
     hostname: surrealdb
     image: surrealdb/surrealdb:v2.3.3
-    command: ["start", "--bind", "0.0.0.0:8000", "--user", "root", "--pass", "root"]
+    # The image's default user can't write to the named volume.
+    user: root
+    # Without a path SurrealDB keeps everything in memory and a container
+    # restart (e.g. after the Mac sleeps) wipes users and descriptions.
+    command: ["start", "--bind", "0.0.0.0:8000", "--user", "root", "--pass", "root", "rocksdb:/data/database.db"]
     env_file:
       - .env
     ports:
