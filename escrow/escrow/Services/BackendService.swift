@@ -120,6 +120,15 @@ struct BackendService {
         }
     }
 
+    /// `GET /api/auth/me` — false only when the server rejects the session (401).
+    func isSessionValid(token: String) async throws -> Bool {
+        let request = try authorized("/api/auth/me", token: token)
+        let (data, response) = try await URLSession.shared.data(for: request)
+        if (response as? HTTPURLResponse)?.statusCode == 401 { return false }
+        try Self.ensureOK(response, data)
+        return true
+    }
+
     private func authorized(_ path: String, token: String) throws -> URLRequest {
         guard let url = URL(string: baseURL + path) else {
             throw BackendError.invalidURL

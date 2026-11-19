@@ -66,6 +66,13 @@ struct AuthService {
         return auth
     }
 
+    /// Asks the backend whether it still knows this session. Network trouble
+    /// counts as valid: being offline is not a reason to ask for a signature.
+    func isSessionValid() async -> Bool {
+        guard let token = keychain.read(WalletKeychainKeys.token) else { return false }
+        return (try? await backend.isSessionValid(token: token)) ?? true
+    }
+
     /// Convenience: prepare + complete in one shot (e.g. silent re-login).
     @discardableResult
     func login() async throws -> AuthResponse {

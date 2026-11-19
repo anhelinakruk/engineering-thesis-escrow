@@ -200,6 +200,23 @@ pub async fn verify_and_login(
     Ok((headers, Json(AuthResponse { access_token: token, user_id })))
 }
 
+/// `GET /api/auth/me` — whose session this is. 401 when the token is invalid
+/// or its user no longer exists, so the app knows to ask for a new signature.
+pub async fn me(claims: Claims, State(state): State<AppState>) -> Response {
+    match state.get_user_address(&claims.sub).await {
+        Ok(Some(address)) => Json(serde_json::json!({ "address": address })).into_response(),
+        Ok(None) => {
+            let body = ApiError {
+                code: 401,
+                message: "Unauthorized".to_string(),
+                details: "unknown user".to_string(),
+            };
+            (StatusCode::UNAUTHORIZED, Json(body)).into_response()
+        }
+        Err(e) => AppError(e).into_response(),
+    }
+}
+
 fn extract_nonce(message: &str) -> Option<String> {
     let marker = "Nonce: ";
     if let Some(start) = message.find(marker) {

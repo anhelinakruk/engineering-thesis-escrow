@@ -50,6 +50,7 @@ async fn main() {
         .route("/health", get(health))
         .route("/api/auth/nonce", get(auth::get_nonce))
         .route("/api/auth/verify", post(auth::verify_and_login))
+        .route("/api/auth/me", get(auth::me))
         .route("/api/escrows/descriptions", get(get_descriptions))
         .route(
             "/api/escrows/:id/description",
