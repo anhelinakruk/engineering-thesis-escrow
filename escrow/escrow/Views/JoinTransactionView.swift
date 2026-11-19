@@ -24,7 +24,7 @@ struct JoinTransactionView: View {
                     termsSection(terms)
                 }
                 if onJoin != nil {
-                    Text("Joining: \(networkFeeNote)")
+                    Label(networkFeeNote, systemImage: "fuelpump")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)

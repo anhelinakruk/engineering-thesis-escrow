@@ -136,6 +136,17 @@ struct SendView: View {
                 Color.white.opacity(0.04),
                 in: RoundedRectangle(cornerRadius: 14, style: .continuous)
             )
+
+            // The field scrolls, so show the whole address once more to check.
+            // One line, shrunk to fit: wrapping would let iOS hyphenate it.
+            if !recipient.isEmpty {
+                Text(recipient.trimmingCharacters(in: .whitespacesAndNewlines))
+                    .font(.footnote.monospaced())
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .padding(.horizontal, 4)
+            }
         }
     }
 }

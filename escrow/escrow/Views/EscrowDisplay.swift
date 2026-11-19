@@ -26,7 +26,7 @@ func ethText(_ wei: String) -> String {
 }
 
 /// Shown before every action that sends a transaction (NFR11).
-let networkFeeNote = "This is an Ethereum transaction and costs a small network fee (gas)."
+let networkFeeNote = "Small network fee (gas)"
 
 struct AddressAvatar: View {
     let address: EthAddress?
