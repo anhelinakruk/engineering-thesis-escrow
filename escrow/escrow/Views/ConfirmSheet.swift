@@ -48,7 +48,7 @@ struct ConfirmSheet: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             if sendsTransaction {
-                Label("Small network fee (gas)", systemImage: "fuelpump")
+                Label(networkFeeNote, systemImage: "fuelpump")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
