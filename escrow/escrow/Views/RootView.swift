@@ -19,6 +19,7 @@ enum OnboardingRoute: Hashable {
 struct RootView: View {
     @StateObject private var vm = WalletViewModel()
     @StateObject private var escrowVM = EscrowViewModel()
+    @Environment(\.scenePhase) private var scenePhase
     @State private var path: [OnboardingRoute] = []
 
     var body: some View {
@@ -47,6 +48,20 @@ struct RootView: View {
         .preferredColorScheme(.dark)
         .buttonStyle(FlatButtonStyle())
         .task { vm.restoreSession() }
+        .task(id: vm.isUnlocked) { await vm.renewSessionIfExpired() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await vm.renewSessionIfExpired() } }
+        }
+        // Shared by sign-up and by renewing an expired session from Home.
+        .sheet(isPresented: signingPresented) {
+            if let message = vm.pendingSIWEMessage {
+                SigningSheet(
+                    message: message,
+                    onSign: { try await vm.completeSignIn() },
+                    onCancel: { vm.cancelSignIn() }
+                )
+            }
+        }
         // A link opened before sign-in or unlock waits in `invite` until Home shows it.
         .onOpenURL { url in Task { await escrowVM.open(url) } }
         .alert("Something went wrong", isPresented: errorBinding) {
@@ -87,15 +102,6 @@ struct RootView: View {
                     ImportWalletView(onImport: vm.importWallet)
                         .navigationBarBackButtonHidden(true)
                 }
-            }
-        }
-        .sheet(isPresented: signingPresented) {
-            if let message = vm.pendingSIWEMessage {
-                SigningSheet(
-                    message: message,
-                    onSign: { try await vm.completeSignIn() },
-                    onCancel: { vm.cancelSignIn() }
-                )
             }
         }
     }

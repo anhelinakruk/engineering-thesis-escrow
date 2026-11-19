@@ -48,3 +48,27 @@ struct SIWEMessage {
         """
     }
 }
+
+/// Reads the backend JWT's `exp` claim. No signature check: the server
+/// verifies tokens; the app only needs to know when to ask for a new one.
+enum JWT {
+    static func expiry(of token: String) -> Date? {
+        let parts = token.split(separator: ".")
+        guard parts.count == 3 else { return nil }
+        var payload = parts[1]
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
+        payload += String(repeating: "=", count: (4 - payload.count % 4) % 4)
+        guard let data = Data(base64Encoded: payload),
+              let claims = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let exp = claims["exp"] as? Double
+        else { return nil }
+        return Date(timeIntervalSince1970: exp)
+    }
+
+    /// True for an unreadable token or one that expires within `margin`.
+    static func needsRenewal(_ token: String, now: Date = .now, margin: TimeInterval = 60) -> Bool {
+        guard let expiry = expiry(of: token) else { return true }
+        return expiry.timeIntervalSince(now) < margin
+    }
+}

@@ -101,6 +101,17 @@ final class WalletViewModel: ObservableObject {
         hasWallet = true
     }
 
+    /// The backend's JWT lasts 7 days; after that escrow descriptions stop
+    /// loading. Ask for a fresh SIWE signature (the same sheet as at sign-up)
+    /// rather than failing quietly. The user still decides whether to sign.
+    func renewSessionIfExpired() async {
+        guard hasWallet, isUnlocked, pendingSIWEMessage == nil,
+              let token = keychain.read(WalletKeychainKeys.token),
+              JWT.needsRenewal(token)
+        else { return }
+        await prepareSignIn()
+    }
+
     func cancelSignIn() {
         pendingSIWEMessage = nil
     }
