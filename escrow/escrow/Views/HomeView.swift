@@ -98,7 +98,12 @@ struct HomeView: View {
         }
         .escrowErrorAlert(vm)
         .sheet(isPresented: $showLogoutConfirm) {
-            LogoutSheet(
+            ConfirmSheet(
+                icon: "rectangle.portrait.and.arrow.right",
+                title: "Log out of this wallet?",
+                message: "Make sure you've saved your recovery phrase — it's the only way to restore this wallet.",
+                confirmTitle: "Log out",
+                isDestructive: true,
                 onConfirm: {
                     showLogoutConfirm = false
                     onLogout()

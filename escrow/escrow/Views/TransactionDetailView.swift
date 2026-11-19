@@ -14,6 +14,8 @@ private struct DetailAction: Identifiable {
     let action: EscrowAction
     let title: String
     let confirmation: String
+    let icon: String
+    var isDestructive = false
     var id: String { title }
 }
 
@@ -69,20 +71,20 @@ struct TransactionDetailView: View {
         .sheet(isPresented: $showingInviteLink) {
             JoinTransactionView(escrow: transaction)
         }
-        .confirmationDialog(
-            pendingAction?.title ?? "",
-            isPresented: Binding(
-                get: { pendingAction != nil },
-                set: { if !$0 { pendingAction = nil } }
-            ),
-            titleVisibility: .visible,
-            presenting: pendingAction
-        ) { item in
-            Button(item.title) {
-                Task { await vm.perform(item.action, id: transaction.id) }
-            }
-        } message: { item in
-            Text("\(item.confirmation)\n\n\(networkFeeNote)")
+        .sheet(item: $pendingAction) { item in
+            ConfirmSheet(
+                icon: item.icon,
+                title: "\(item.title)?",
+                message: item.confirmation,
+                confirmTitle: item.title,
+                isDestructive: item.isDestructive,
+                sendsTransaction: true,
+                onConfirm: {
+                    pendingAction = nil
+                    Task { await vm.perform(item.action, id: transaction.id) }
+                },
+                onCancel: { pendingAction = nil }
+            )
         }
         .escrowErrorAlert(vm)
         .safeAreaInset(edge: .bottom) {
@@ -309,19 +311,24 @@ struct TransactionDetailView: View {
         switch (transaction.state, isBuyer) {
         case (.funded, true) where transaction.seller == nil:
             return DetailAction(action: .cancel, title: "Cancel escrow",
-                                confirmation: "Your funds will be returned to you for withdrawal.")
+                                confirmation: "Your funds come back to you, ready to claim.",
+                                icon: "xmark.circle", isDestructive: true)
         case (.funded, true) where passed(transaction.shipDeadline):
             return DetailAction(action: .refundExpired, title: "Reclaim funds",
-                                confirmation: "The seller missed the shipping deadline. Your funds will be returned to you.")
+                                confirmation: "The seller missed the shipping deadline. Your funds come back to you.",
+                                icon: "arrow.uturn.backward.circle")
         case (.funded, false):
             return DetailAction(action: .markShipped, title: "Mark as shipped",
-                                confirmation: "The buyer will have 7 days to confirm receipt.")
+                                confirmation: "The buyer then has 7 days to confirm receipt.",
+                                icon: "shippingbox")
         case (.shipped, true):
             return DetailAction(action: .confirmReceipt, title: "Confirm receipt",
-                                confirmation: "The funds will be released to the seller. This cannot be undone.")
+                                confirmation: "The funds go to the seller. This can't be undone.",
+                                icon: "checkmark.seal")
         case (.shipped, false) where passed(transaction.confirmDeadline):
             return DetailAction(action: .autoComplete, title: "Release funds",
-                                confirmation: "The buyer didn't confirm in time. The funds will be released to you.")
+                                confirmation: "The buyer didn't confirm in time. The funds go to you.",
+                                icon: "banknote")
         default:
             return nil
         }
@@ -330,7 +337,8 @@ struct TransactionDetailView: View {
     private var secondaryAction: DetailAction? {
         guard transaction.state == .shipped else { return nil }
         return DetailAction(action: .raiseDispute, title: "Report a dispute",
-                            confirmation: "The arbiter will decide who receives the funds.")
+                            confirmation: "The arbiter will decide who gets the funds.",
+                            icon: "exclamationmark.triangle", isDestructive: true)
     }
 }
 
