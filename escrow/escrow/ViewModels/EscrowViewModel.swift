@@ -85,7 +85,15 @@ final class EscrowViewModel: ObservableObject {
         else { return }
         let key = URLComponents(url: url, resolvingAgainstBaseURL: false)?
             .queryItems?.first { $0.name == "k" }?.value
-        invite = await escrow(id: id, inviteKey: key)
+        guard let escrow = await escrow(id: id, inviteKey: key) else { return }
+        // Say why up front instead of offering a Join the contract would reject.
+        if escrow.isBuyer(myAddress) {
+            errorMessage = "This is your own escrow. Share the link with the seller."
+        } else if escrow.state != .funded || escrow.seller != nil {
+            errorMessage = "This escrow is no longer open to join."
+        } else {
+            invite = escrow
+        }
     }
 
     /// Returns the new escrow's id, or nil if it failed (errorMessage is set).
