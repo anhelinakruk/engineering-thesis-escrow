@@ -35,11 +35,14 @@ forge test              # unit, security and fuzz tests
 forge coverage
 ```
 
-The arbiter settles a dispute with:
+The arbiter settles a dispute by calling the contract directly; `cast send`
+asks the node for the gas estimate, which matters on Sepolia:
 
 ```bash
-ESCROW_CONTRACT=<address> ESCROW_ID=<id> RULING=buyer \
-  forge script script/Resolve.s.sol --rpc-url <rpc> \
-  --account <arbiter> --sender <arbiter address> --broadcast
-# RULING=seller pays the seller instead
+cast send <contract> "resolveForBuyer(uint256)" <id> --rpc-url <rpc> --account <arbiter>
+# or "resolveForSeller(uint256)" to pay the seller
 ```
+
+`contracts/script/Resolve.s.sol` does the same on a local Anvil chain. On
+Sepolia, forge's own gas estimate is too low (it simulates older gas pricing),
+so the script needs `--gas-estimate-multiplier 400`.
