@@ -40,6 +40,9 @@ struct RootView: View {
                     })
                 }
                 .environmentObject(escrowVM)
+                // On the stack, not on Home: pushing Detail would cancel a
+                // Home-level task and stop the polling.
+                .task { await escrowVM.keepRefreshing() }
             } else {
                 onboarding
             }
